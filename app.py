@@ -29,9 +29,17 @@ app.config.from_object(get_config(env))
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+# 🔹 IMPORTANTE: crear tablas si no existen (también en Render)
+with app.app_context():
+    try:
+        db.create_all()
+        app.logger.info("✅ Tablas de la base de datos verificadas/creadas")
+    except Exception as e:
+        app.logger.error(f"❌ Error inicializando la base de datos: {e}")
+
 # Importar servicio de correos
 from email_service import mail, enviar_confirmacion_pago, enviar_recordatorio_pago, enviar_aviso_vencimiento
-mail.init_app(app)
+
 
 # Importar license manager
 from license_manager import license_manager
@@ -1265,4 +1273,5 @@ if __name__ == '__main__':
         host=host,
         port=port,
         use_reloader=False
+
     )
