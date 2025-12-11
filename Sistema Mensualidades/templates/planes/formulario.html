@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Editar' if plan else 'Nuevo' }} Plan - Sistema de Mensualidades{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>
+        <i class="bi bi-tags-{{ 'fill' if plan else '' }}"></i> 
+        {{ 'Editar Plan' if plan else 'Nuevo Plan' }}
+    </h2>
+    <p>{{ 'Actualiza la información del plan' if plan else 'Define un nuevo plan de servicio o mensualidad' }}</p>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title"><i class="bi bi-file-text"></i> Información del Plan</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <!-- Nombre del Plan -->
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre del Plan *</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="nombre" 
+                               name="nombre" 
+                               value="{{ plan.nombre if plan else '' }}"
+                               placeholder="Ej: Plan Básico, Plan Premium, Mensualidad Gym"
+                               required
+                               autofocus>
+                        <small class="text-muted">Nombre descriptivo para identificar el plan</small>
+                    </div>
+
+                    <div class="row">
+                        <!-- Precio -->
+                        <div class="col-md-6 mb-3">
+                            <label for="precio" class="form-label">Precio *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="precio" 
+                                       name="precio" 
+                                       step="0.01" 
+                                       min="0.01"
+                                       value="{{ plan.precio if plan else '' }}"
+                                       required>
+                            </div>
+                            <small class="text-muted">Monto a cobrar por periodo</small>
+                        </div>
+
+                        <!-- Duración -->
+                        <div class="col-md-6 mb-3">
+                            <label for="duracion_dias" class="form-label">Duración (días) *</label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="duracion_dias" 
+                                   name="duracion_dias" 
+                                   min="1"
+                                   value="{{ plan.duracion_dias if plan else '30' }}"
+                                   required>
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle"></i> 
+                                30 días = mensual, 7 días = semanal
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Descripción -->
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" 
+                                  id="descripcion" 
+                                  name="descripcion" 
+                                  rows="4"
+                                  placeholder="Describe los beneficios y características del plan...">{{ plan.descripcion if plan else '' }}</textarea>
+                        <small class="text-muted">Opcional: detalles sobre qué incluye este plan</small>
+                    </div>
+
+                    <!-- Estado (solo al editar) -->
+                    {% if plan %}
+                    <div class="mb-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" 
+                                   type="checkbox" 
+                                   id="activo" 
+                                   name="activo"
+                                   {% if plan.activo %}checked{% endif %}>
+                            <label class="form-check-label" for="activo">
+                                <strong>Plan Activo</strong>
+                            </label>
+                        </div>
+                        <small class="text-muted">
+                            Los planes inactivos no se pueden asignar a nuevos clientes
+                        </small>
+                    </div>
+
+                    <!-- Info de clientes actuales -->
+                    {% if plan.clientes %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>{{ plan.clientes|length }}</strong> cliente{{ 's' if plan.clientes|length != 1 else '' }} 
+                        {{ 'tienen' if plan.clientes|length != 1 else 'tiene' }} este plan asignado
+                        {% if plan.clientes|length > 0 %}
+                        <br><small>Al editar el plan, los cambios afectarán a todos los clientes</small>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endif %}
+
+                    <!-- Preview Card -->
+                    <div class="card bg-light mb-4">
+                        <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <h6 class="mb-0">Vista Previa</h6>
+                        </div>
+                        <div class="card-body text-center">
+                            <h4 id="preview-nombre" class="text-primary">{{ plan.nombre if plan else 'Nombre del Plan' }}</h4>
+                            <h2 class="display-5 fw-bold my-3">
+                                $<span id="preview-precio">{{ "%.2f"|format(plan.precio) if plan else '0.00' }}</span>
+                            </h2>
+                            <p class="text-muted">
+                                cada <span id="preview-dias">{{ plan.duracion_dias if plan else '30' }}</span> días
+                            </p>
+                            <p id="preview-descripcion" class="small text-muted mt-3">
+                                {{ plan.descripcion if plan and plan.descripcion else 'Sin descripción' }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{{ url_for('planes') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-{{ 'save' if plan else 'plus-circle' }}"></i> 
+                            {{ 'Guardar Cambios' if plan else 'Crear Plan' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Live preview
+    document.addEventListener('DOMContentLoaded', function() {
+        const nombreInput = document.getElementById('nombre');
+        const precioInput = document.getElementById('precio');
+        const diasInput = document.getElementById('duracion_dias');
+        const descripcionInput = document.getElementById('descripcion');
+
+        const previewNombre = document.getElementById('preview-nombre');
+        const previewPrecio = document.getElementById('preview-precio');
+        const previewDias = document.getElementById('preview-dias');
+        const previewDescripcion = document.getElementById('preview-descripcion');
+
+        nombreInput.addEventListener('input', function() {
+            previewNombre.textContent = this.value || 'Nombre del Plan';
+        });
+
+        precioInput.addEventListener('input', function() {
+            const precio = parseFloat(this.value) || 0;
+            previewPrecio.textContent = precio.toFixed(2);
+        });
+
+        diasInput.addEventListener('input', function() {
+            previewDias.textContent = this.value || '30';
+        });
+
+        descripcionInput.addEventListener('input', function() {
+            previewDescripcion.textContent = this.value || 'Sin descripción';
+        });
+    });
+
+    // Calcular precio por día
+    const precioInput = document.getElementById('precio');
+    const diasInput = document.getElementById('duracion_dias');
+
+    function calcularPrecioDiario() {
+        const precio = parseFloat(precioInput.value) || 0;
+        const dias = parseInt(diasInput.value) || 1;
+        const precioDiario = precio / dias;
+        console.log(`Precio por día: $${precioDiario.toFixed(2)}`);
+    }
+
+    precioInput.addEventListener('input', calcularPrecioDiario);
+    diasInput.addEventListener('input', calcularPrecioDiario);
+</script>
+{% endblock %}

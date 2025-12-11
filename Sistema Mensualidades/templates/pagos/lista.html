@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Pagos - Sistema de Mensualidades{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2><i class="bi bi-credit-card"></i> Gestión de Pagos</h2>
+    <p>Historial completo de pagos recibidos</p>
+</div>
+
+<!-- Stats Summary -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon success">
+                <i class="bi bi-currency-dollar"></i>
+            </div>
+            <div class="stat-info">
+                <h5>Total Recibido</h5>
+                <h3>${{ "%.2f"|format(pagos|sum(attribute='monto') if pagos else 0) }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon primary">
+                <i class="bi bi-file-text"></i>
+            </div>
+            <div class="stat-info">
+                <h5>Total de Pagos</h5>
+                <h3>{{ pagos|length }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-3">
+        <div class="stat-card">
+            <div class="stat-icon warning">
+                <i class="bi bi-graph-up"></i>
+            </div>
+            <div class="stat-info">
+                <h5>Promedio por Pago</h5>
+                <h3>
+                    {% if pagos %}
+                        ${{ "%.2f"|format((pagos|sum(attribute='monto')) / (pagos|length)) }}
+                    {% else %}
+                        $0.00
+                    {% endif %}
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payments Table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title"><i class="bi bi-list"></i> Historial de Pagos ({{ pagos|length }})</h5>
+    </div>
+    <div class="card-body">
+        {% if pagos %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Cliente</th>
+                        <th>Monto</th>
+                        <th>Método</th>
+                        <th>Referencia</th>
+                        <th>Periodo</th>
+                        <th>Notas</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pago in pagos %}
+                    <tr>
+                        <td>
+                            <strong>{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</strong><br>
+                            <small class="text-muted">{{ pago.fecha_pago.strftime('%H:%M') }}</small>
+                        </td>
+                        <td>
+                            <strong>{{ pago.cliente.nombre_completo }}</strong><br>
+                            <small class="text-muted">
+                                <i class="bi bi-envelope"></i> {{ pago.cliente.email }}
+                            </small>
+                        </td>
+                        <td>
+                            <span class="badge bg-success fw-bold" style="font-size: 14px;">
+                                ${{ "%.2f"|format(pago.monto) }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if pago.metodo_pago %}
+                                <span class="badge bg-info">{{ pago.metodo_pago }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">No especificado</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ pago.referencia or '-' }}</td>
+                        <td>{{ pago.periodo or '-' }}</td>
+                        <td>
+                            {% if pago.notas %}
+                                <span title="{{ pago.notas }}">
+                                    {{ pago.notas[:20] }}{{ '...' if pago.notas|length > 20 else '' }}
+                                </span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('cliente_detalle', id=pago.cliente_id) }}" 
+                                   class="btn btn-sm btn-outline-primary" 
+                                   title="Ver Cliente">
+                                    <i class="bi bi-person"></i>
+                                </a>
+                                <button type="button" 
+                                        class="btn btn-sm btn-outline-danger" 
+                                        onclick="confirmarEliminar({{ pago.id }}, '{{ pago.cliente.nombre_completo }}', {{ pago.monto }})"
+                                        title="Eliminar">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <td colspan="2"><strong>TOTAL GENERAL</strong></td>
+                        <td>
+                            <strong class="text-success" style="font-size: 16px;">
+                                ${{ "%.2f"|format(pagos|sum(attribute='monto')) }}
+                            </strong>
+                        </td>
+                        <td colspan="5"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox" style="font-size: 64px; color: #ccc;"></i>
+            <h4 class="mt-3 text-muted">No hay pagos registrados</h4>
+            <p class="text-muted">Los pagos aparecerán aquí una vez que sean registrados</p>
+            <a href="{{ url_for('clientes') }}" class="btn btn-primary mt-3">
+                <i class="bi bi-people"></i> Ver Clientes
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function confirmarEliminar(pagoId, clienteNombre, monto) {
+        if (confirm(`¿Estás seguro de eliminar el pago de $${monto.toFixed(2)} de "${clienteNombre}"?\n\nEsta acción no se puede deshacer.`)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/pagos/${pagoId}/eliminar`;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+</script>
+{% endblock %}

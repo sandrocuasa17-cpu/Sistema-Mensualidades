@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sistema de Mensualidades{% endblock %}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --success-color: #38ef7d;
+            --danger-color: #f5576c;
+            --warning-color: #ffc107;
+            --dark-color: #2d3748;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 260px;
+            background: linear-gradient(180deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            padding: 20px;
+            box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        .sidebar .logo {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .sidebar .logo h3 {
+            color: white;
+            font-weight: 700;
+            font-size: 22px;
+        }
+        
+        .sidebar .logo p {
+            color: rgba(255,255,255,0.8);
+            font-size: 12px;
+            margin: 0;
+        }
+        
+        /* NUEVO: Badge de estado de licencia */
+        .license-badge {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .license-badge.demo {
+            background: rgba(255, 193, 7, 0.3);
+            border-color: rgba(255, 193, 7, 0.5);
+        }
+        
+        .license-badge.active {
+            background: rgba(56, 239, 125, 0.3);
+            border-color: rgba(56, 239, 125, 0.5);
+        }
+        
+        .license-badge small {
+            color: white;
+            font-size: 10px;
+            display: block;
+            margin-bottom: 5px;
+            opacity: 0.9;
+        }
+        
+        .license-badge strong {
+            color: white;
+            font-size: 12px;
+            display: block;
+        }
+        
+        .nav-item {
+            margin-bottom: 10px;
+        }
+        
+        .nav-link {
+            color: rgba(255,255,255,0.8);
+            padding: 12px 20px;
+            border-radius: 8px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+        }
+        
+        .nav-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: white;
+            transform: translateX(5px);
+        }
+        
+        .nav-link.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+        
+        .nav-link i {
+            margin-right: 12px;
+            font-size: 18px;
+        }
+        
+        /* Main Content */
+        .main-content {
+            margin-left: 260px;
+            padding: 30px;
+            min-height: 100vh;
+        }
+        
+        /* Cards */
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s, box-shadow 0.3s;
+            margin-bottom: 30px;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        
+        .card-header {
+            background: white;
+            border-bottom: 2px solid #f0f0f0;
+            padding: 20px;
+            border-radius: 15px 15px 0 0 !important;
+        }
+        
+        .card-title {
+            font-weight: 600;
+            color: var(--dark-color);
+            margin: 0;
+        }
+        
+        /* Stats Cards */
+        .stat-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: all 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+        
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-right: 20px;
+        }
+        
+        .stat-icon.primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+        }
+        
+        .stat-icon.success {
+            background: linear-gradient(135deg, #11998e, var(--success-color));
+            color: white;
+        }
+        
+        .stat-icon.danger {
+            background: linear-gradient(135deg, #f093fb, var(--danger-color));
+            color: white;
+        }
+        
+        .stat-icon.warning {
+            background: linear-gradient(135deg, #ffc107, #ff9800);
+            color: white;
+        }
+        
+        .stat-info h5 {
+            color: #999;
+            font-size: 14px;
+            font-weight: 500;
+            margin: 0;
+        }
+        
+        .stat-info h3 {
+            color: var(--dark-color);
+            font-weight: 700;
+            margin: 5px 0 0 0;
+        }
+        
+        .stat-info h6 {
+            color: var(--dark-color);
+            font-weight: 600;
+            margin: 5px 0 0 0;
+            font-size: 14px;
+        }
+        
+        /* Buttons */
+        .btn {
+            border-radius: 8px;
+            padding: 10px 24px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border: none;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #11998e, var(--success-color));
+            border: none;
+        }
+        
+        /* Badges */
+        .badge {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        
+        .badge-moroso {
+            background: linear-gradient(135deg, #f093fb, var(--danger-color));
+        }
+        
+        .badge-al-dia {
+            background: linear-gradient(135deg, #11998e, var(--success-color));
+        }
+        
+        .badge-por-vencer {
+            background: var(--warning-color);
+            color: #333;
+        }
+        
+        .badge-vencido {
+            background: linear-gradient(135deg, #c0392b, #e74c3c);
+            color: white;
+        }
+        
+        /* Tables */
+        .table {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .table thead th {
+            background: #f8f9fa;
+            border: none;
+            color: var(--dark-color);
+            font-weight: 600;
+            padding: 15px;
+        }
+        
+        .table tbody td {
+            padding: 15px;
+            vertical-align: middle;
+            border-color: #f0f0f0;
+        }
+        
+        /* Forms */
+        .form-control, .form-select {
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            padding: 10px 15px;
+            transition: all 0.3s;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        
+        .form-label {
+            font-weight: 500;
+            color: var(--dark-color);
+            margin-bottom: 8px;
+        }
+        
+        /* Alerts */
+        .alert {
+            border: none;
+            border-radius: 10px;
+            padding: 15px 20px;
+        }
+        
+        /* Page Header */
+        .page-header {
+            background: white;
+            padding: 25px 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+        }
+        
+        .page-header h2 {
+            margin: 0;
+            color: var(--dark-color);
+            font-weight: 700;
+        }
+        
+        .page-header p {
+            margin: 5px 0 0 0;
+            color: #999;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+            
+            .main-content {
+                margin-left: 0;
+                padding: 15px;
+            }
+        }
+    </style>
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="logo">
+            <i class="bi bi-cash-coin" style="font-size: 40px; color: white;"></i>
+            <h3>Sistema</h3>
+            <p>Gestión de Mensualidades</p>
+        </div>
+        
+        <!-- NUEVO: Badge de estado de licencia -->
+        {% if session.get('es_demo') %}
+        <div class="license-badge demo">
+            <small>🔧 MODO DEMO</small>
+            {% if session.get('licencia_info', {}).get('minutos_restantes') %}
+            <strong>⏰ {{ session.get('licencia_info', {}).get('minutos_restantes') }} min</strong>
+            {% else %}
+            <strong>ACTIVO</strong>
+            {% endif %}
+        </div>
+        {% elif session.get('licencia_info', {}).get('dias_restantes') is not none %}
+        <div class="license-badge active">
+            <small>✅ LICENCIA ACTIVA</small>
+            <strong>{{ session.get('licencia_info', {}).get('dias_restantes') }} días</strong>
+        </div>
+        {% endif %}
+        
+        <nav class="nav flex-column">
+            <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
+                <i class="bi bi-speedometer2"></i>
+                Dashboard
+            </a>
+            <a class="nav-link {% if request.endpoint in ['clientes', 'cliente_nuevo', 'cliente_detalle', 'cliente_editar'] %}active{% endif %}" href="{{ url_for('clientes') }}">
+                <i class="bi bi-people"></i>
+                Clientes
+            </a>
+            <a class="nav-link {% if request.endpoint in ['pagos', 'pago_nuevo'] %}active{% endif %}" href="{{ url_for('pagos') }}">
+                <i class="bi bi-credit-card"></i>
+                Pagos
+            </a>
+            <a class="nav-link {% if request.endpoint in ['planes', 'plan_nuevo', 'plan_editar'] %}active{% endif %}" href="{{ url_for('planes') }}">
+                <i class="bi bi-tags"></i>
+                Planes
+            </a>
+            
+            <hr style="border-color: rgba(255,255,255,0.2); margin: 15px 0;">
+            
+            <a class="nav-link {% if request.endpoint == 'configuracion' %}active{% endif %}" href="{{ url_for('configuracion') }}">
+                <i class="bi bi-gear-fill"></i>
+                Configuración
+            </a>
+        </nav>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        {% block content %}{% endblock %}
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
