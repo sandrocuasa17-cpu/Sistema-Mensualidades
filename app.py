@@ -21,6 +21,7 @@ from config import get_config
 # Inicializar Flask
 app = Flask(__name__)
 
+
 # Cargar configuración según entorno
 env = os.environ.get('FLASK_ENV', 'development')
 app.config.from_object(get_config(env))
@@ -28,14 +29,6 @@ app.config.from_object(get_config(env))
 # Inicializar extensiones
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
-
-# 🔹 IMPORTANTE: crear tablas si no existen (también en Render)
-with app.app_context():
-    try:
-        db.create_all()
-        app.logger.info("✅ Tablas de la base de datos verificadas/creadas")
-    except Exception as e:
-        app.logger.error(f"❌ Error inicializando la base de datos: {e}")
 
 # Importar servicio de correos
 from email_service import mail, enviar_confirmacion_pago, enviar_recordatorio_pago, enviar_aviso_vencimiento
@@ -207,7 +200,13 @@ class Pago(db.Model):
     def __repr__(self):
         return f'<Pago ${self.monto} - {self.cliente.nombre_completo}>'
 
-
+# 🔹 IMPORTANTE: crear tablas si no existen (también en Render)
+with app.app_context():
+    try:
+        db.create_all()
+        app.logger.info("✅ Tablas de la base de datos verificadas/creadas")
+    except Exception as e:
+        app.logger.error(f"❌ Error inicializando la base de datos: {e}")
 # ============================================
 # DECORADORES Y UTILIDADES
 # ============================================
@@ -1273,5 +1272,4 @@ if __name__ == '__main__':
         host=host,
         port=port,
         use_reloader=False
-
     )
