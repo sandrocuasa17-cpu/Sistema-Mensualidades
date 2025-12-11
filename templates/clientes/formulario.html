@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Editar' if cliente else 'Nuevo' }} Cliente - Sistema de Mensualidades{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>
+        <i class="bi bi-person-{{ 'gear' if cliente else 'plus' }}"></i> 
+        {{ 'Editar Cliente' if cliente else 'Nuevo Cliente' }}
+    </h2>
+    <p>{{ 'Actualiza la información del cliente' if cliente else 'Completa los datos del nuevo cliente' }}</p>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="bi bi-file-text"></i> 
+                    {{ 'Información del Cliente' if cliente else 'Datos del Cliente' }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <!-- Nombre -->
+                        <div class="col-md-6 mb-3">
+                            <label for="nombre" class="form-label">Nombre *</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="nombre" 
+                                   name="nombre" 
+                                   value="{{ cliente.nombre if cliente else '' }}"
+                                   required>
+                        </div>
+
+                        <!-- Apellido -->
+                        <div class="col-md-6 mb-3">
+                            <label for="apellido" class="form-label">Apellido *</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="apellido" 
+                                   name="apellido" 
+                                   value="{{ cliente.apellido if cliente else '' }}"
+                                   required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Email -->
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">Email *</label>
+                            <input type="email" 
+                                   class="form-control" 
+                                   id="email" 
+                                   name="email" 
+                                   value="{{ cliente.email if cliente else '' }}"
+                                   required>
+                            <small class="text-muted">Se usará para enviar notificaciones</small>
+                        </div>
+
+                        <!-- Teléfono -->
+                        <div class="col-md-6 mb-3">
+                            <label for="telefono" class="form-label">Teléfono</label>
+                            <input type="tel" 
+                                   class="form-control" 
+                                   id="telefono" 
+                                   name="telefono" 
+                                   value="{{ cliente.telefono if cliente else '' }}">
+                        </div>
+                    </div>
+
+                    <!-- Dirección -->
+                    <div class="mb-3">
+                        <label for="direccion" class="form-label">Dirección</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="direccion" 
+                               name="direccion" 
+                               value="{{ cliente.direccion if cliente else '' }}">
+                    </div>
+
+                    <!-- Plan -->
+                    <div class="mb-3">
+                        <label for="plan_id" class="form-label">Plan</label>
+                        <select class="form-select" id="plan_id" name="plan_id">
+                            <option value="">Sin plan asignado</option>
+                            {% for plan in planes %}
+                            <option value="{{ plan.id }}" 
+                                    {% if cliente and cliente.plan_id == plan.id %}selected{% endif %}>
+                                {{ plan.nombre }} - ${{ "%.2f"|format(plan.precio) }}/{{ plan.duracion_dias }} días
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Notas -->
+                    <div class="mb-3">
+                        <label for="notas" class="form-label">Notas</label>
+                        <textarea class="form-control" 
+                                  id="notas" 
+                                  name="notas" 
+                                  rows="3">{{ cliente.notas if cliente else '' }}</textarea>
+                        <small class="text-muted">Información adicional sobre el cliente</small>
+                    </div>
+
+                    <!-- Estado (solo al editar) -->
+                    {% if cliente %}
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" 
+                                   type="checkbox" 
+                                   id="activo" 
+                                   name="activo"
+                                   {% if cliente.activo %}checked{% endif %}>
+                            <label class="form-check-label" for="activo">
+                                Cliente Activo
+                            </label>
+                        </div>
+                        <small class="text-muted">Desactiva el cliente si ya no es parte del sistema</small>
+                    </div>
+                    {% endif %}
+
+                    <!-- Botones -->
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{{ url_for('clientes') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-{{ 'save' if cliente else 'plus-circle' }}"></i> 
+                            {{ 'Guardar Cambios' if cliente else 'Crear Cliente' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
