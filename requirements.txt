@@ -1,8 +1,26 @@
+# -*- coding: utf-8 -*-
+# Dependencias del Sistema de Gestión de Mensualidades
+# Compatible con Python 3.8+
+
+# Framework Web
 Flask==3.0.0
+Werkzeug==3.0.1
+
+# Base de Datos
 Flask-SQLAlchemy==3.1.1
 Flask-Migrate==4.0.5
+
+# PostgreSQL para Render (producción)
+psycopg2-binary==2.9.9
+
+# Correo Electrónico
 Flask-Mail==0.9.1
+
+# Variables de Entorno
 python-dotenv==1.0.0
-email-validator==2.1.0
+
+# Utilidades
 APScheduler==3.10.4
-gunicorn
+
+# Servidor WSGI para producción
+gunicorn==21.2.0
