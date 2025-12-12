@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Sistema de Gestión de Mensualidades
@@ -34,24 +35,25 @@ app.config.from_object(get_config(env))
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# Inicializar BackupManager
-# ✅ CRÍTICO: La base de datos se guarda en instance/database.db automáticamente
+# Inicializar BackupManager con manejo inteligente de PostgreSQL/SQLite
 db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+
 if 'sqlite:///' in db_uri:
-    # Extraer ruta relativa
+    # ✅ SQLite: Backups habilitados
     db_path_relative = db_uri.replace('sqlite:///', '')
     
-    # Si no tiene 'instance/' al inicio, agregarlo
     if not db_path_relative.startswith('instance/'):
-        # Flask usa instance/ por defecto
         db_path = os.path.join('instance', os.path.basename(db_path_relative))
     else:
         db_path = db_path_relative
+    
+    backup_manager = BackupManager(app, db_path)
+    app.logger.info(f"📦 BackupManager inicializado (SQLite): {db_path}")
+    
 else:
-    db_path = 'instance/database.db'  # Fallback seguro
-
-backup_manager = BackupManager(app, db_path)
-app.logger.info(f"📦 BackupManager inicializado con ruta: {db_path}")
+    # ✅ PostgreSQL: Backups deshabilitados pero manager disponible
+    backup_manager = BackupManager(app, db_path=None)
+    app.logger.info(f"📦 BackupManager inicializado (PostgreSQL - sin backups)")
 
 # Importar servicio de correos
 from email_service import mail, enviar_confirmacion_pago, enviar_recordatorio_pago, enviar_aviso_vencimiento
@@ -925,7 +927,7 @@ def test_correo():
     
     return redirect(url_for('configuracion'))
 # ============================================
-# REEMPLAZAR LAS RUTAS DE BACKUP EXISTENTES
+# RUTAS DE BACKUP CORREGIDAS
 # ============================================
 
 @app.route('/backup/info')
@@ -941,14 +943,15 @@ def backup_info():
                 'info': {
                     'nombre': info['nombre'],
                     'tamano_mb': info['tamano_mb'],
-                    'fecha_modificacion': info['fecha_modificacion_str']
+                    'fecha_modificacion': info['fecha_modificacion_str'],
+                    'tipo': info.get('tipo', 'SQLite'),
+                    'backups_disponibles': info.get('backups_disponibles', False)
                 }
             })
         else:
-            app.logger.error("Base de datos no encontrada")
             return jsonify({
                 'success': False, 
-                'error': 'Base de datos no encontrada'
+                'error': 'Información no disponible'
             }), 404
             
     except Exception as e:
@@ -962,8 +965,13 @@ def backup_info():
 @app.route('/backup/descargar')
 @requiere_licencia
 def descargar_bd():
-    """Descarga un backup de la base de datos"""
+    """Descarga un backup de la base de datos (solo SQLite)"""
     try:
+        # Verificar si los backups están disponibles
+        if not backup_manager.is_sqlite:
+            flash('⚠️ Los backups solo están disponibles en desarrollo local (SQLite)', 'warning')
+            return redirect(url_for('configuracion'))
+        
         # Crear backup temporal
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         nombre_backup = f"backup_{timestamp}.db"
@@ -990,8 +998,13 @@ def descargar_bd():
 @app.route('/backup/subir', methods=['POST'])
 @requiere_licencia
 def subir_bd():
-    """Restaura la base de datos desde un archivo subido"""
+    """Restaura la base de datos desde un archivo (solo SQLite)"""
     try:
+        # Verificar si los backups están disponibles
+        if not backup_manager.is_sqlite:
+            flash('⚠️ La restauración solo está disponible en desarrollo local (SQLite)', 'warning')
+            return redirect(url_for('configuracion'))
+        
         archivo = request.files.get('archivo_bd')
         
         if not archivo:
@@ -1059,18 +1072,6 @@ def subir_bd():
                 a:hover {{
                     text-decoration: underline;
                 }}
-                .spinner {{
-                    display: inline-block;
-                    width: 20px;
-                    height: 20px;
-                    border: 3px solid rgba(0,0,0,.1);
-                    border-radius: 50%;
-                    border-top-color: #007bff;
-                    animation: spin 1s ease-in-out infinite;
-                }}
-                @keyframes spin {{
-                    to {{ transform: rotate(360deg); }}
-                }}
             </style>
         </head>
         <body>
@@ -1078,7 +1079,6 @@ def subir_bd():
                 <div class="success-icon">✅</div>
                 <h2>Base de datos restaurada exitosamente</h2>
                 <p>La página se recargará automáticamente en 3 segundos...</p>
-                <div class="spinner"></div>
                 <p style="margin-top: 20px;">
                     <a href="{url_for('index')}">Haz clic aquí si no se recarga automáticamente</a>
                 </p>
@@ -1091,8 +1091,6 @@ def subir_bd():
         app.logger.error(f"Error restaurando backup: {e}")
         flash(f'Error al restaurar backup: {str(e)}', 'danger')
         return redirect(url_for('configuracion'))
-
-
 # ============================================
 # TAREA PROGRAMADA: LIMPIAR BACKUPS ANTIGUOS
 # ============================================
@@ -1456,67 +1454,50 @@ if __name__ == '__main__':
     # ✅ INICIALIZACIÓN INTELIGENTE DE BASE DE DATOS
     with app.app_context():
         try:
-            # Obtener ruta real de la base de datos
             db_uri = app.config['SQLALCHEMY_DATABASE_URI']
-            db_path = db_uri.replace('sqlite:///', '')
-            db_existe = os.path.exists(db_path)
             
-            if db_existe:
-                # ✅ Base de datos YA EXISTE - Solo verificar estructura
-                app.logger.info(f"✅ Base de datos existente detectada: {db_path}")
-                app.logger.info("🔍 Verificando estructura de tablas...")
+            if 'sqlite:///' in db_uri:
+                # SQLite: Verificar archivo
+                db_path = db_uri.replace('sqlite:///', '')
+                db_existe = os.path.exists(db_path)
                 
-                # db.create_all() es INTELIGENTE:
-                # - Solo crea tablas que NO existen
-                # - NO borra datos existentes
-                # - NO sobrescribe tablas existentes
-                db.create_all()
-                
-                app.logger.info("✅ Estructura verificada - Datos preservados")
-                
+                if db_existe:
+                    app.logger.info(f"✅ Base de datos SQLite existente: {db_path}")
+                else:
+                    app.logger.info(f"🆕 Creando nueva base de datos SQLite: {db_path}")
             else:
-                # 🆕 NO EXISTE - Crear nueva base de datos
-                app.logger.info(f"🆕 Creando nueva base de datos en: {db_path}")
-                db.create_all()
-                app.logger.info("✅ Nueva base de datos creada exitosamente")
-                
-                # Opcional: Crear configuración inicial
-                try:
-                    # Verificar si ya existe configuración
-                    config_existe = Configuracion.query.first()
-                    
-                    if not config_existe:
-                        # Crear configuración inicial solo si no existe
-                        Configuracion.establecer('SISTEMA_INICIALIZADO', 'true', 'Sistema inicializado correctamente')
-                        app.logger.info("✅ Configuración inicial creada")
-                except Exception as e:
-                    app.logger.warning(f"⚠️ No se pudo crear configuración inicial: {e}")
-                    
+                # PostgreSQL: No verificar archivo
+                app.logger.info(f"✅ Usando PostgreSQL en producción")
+            
+            # Crear todas las tablas (es seguro, no borra datos)
+            db.create_all()
+            app.logger.info("✅ Estructura de base de datos verificada")
+            
         except Exception as e:
             app.logger.error(f"❌ Error inicializando la base de datos: {e}")
             import traceback
             app.logger.error(traceback.format_exc())
     
     # Configurar host y puerto
-    host = '127.0.0.1'
+    host = '0.0.0.0' if Config.is_production() else '127.0.0.1'
     port = int(os.environ.get('PORT', 5000))
     url = f"http://{host}:{port}"
     
-    # Programar apertura del navegador (SIEMPRE)
-    threading.Thread(
-        target=abrir_navegador,
-        args=(url, 2),
-        daemon=True
-    ).start()
-    
-    if not ejecutable:
+    # Solo abrir navegador en desarrollo
+    if not Config.is_production() and not ejecutable:
+        threading.Thread(
+            target=abrir_navegador,
+            args=(url, 2),
+            daemon=True
+        ).start()
+        
         print(f"\n🌐 Servidor: {url}")
         print(f"⏳ El navegador se abrirá en 2 segundos...")
         print(f"💡 Presiona Ctrl+C para detener\n")
         print("=" * 60 + "\n")
     
     # Iniciar servidor
-    debug = False if ejecutable else app.config.get('DEBUG', False)
+    debug = False if ejecutable or Config.is_production() else app.config.get('DEBUG', False)
     app.run(
         debug=debug,
         host=host,
