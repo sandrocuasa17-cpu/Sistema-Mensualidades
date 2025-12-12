@@ -16,7 +16,8 @@ from datetime import datetime, timedelta
 import sys
 from flask import send_file
 from werkzeug.utils import secure_filename
-
+from backup_manager import BackupManager
+from pathlib import Path
 
 # Importar configuración centralizada
 from config import get_config
@@ -33,6 +34,24 @@ app.config.from_object(get_config(env))
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+# Inicializar BackupManager
+# ✅ CRÍTICO: La base de datos se guarda en instance/database.db automáticamente
+db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+if 'sqlite:///' in db_uri:
+    # Extraer ruta relativa
+    db_path_relative = db_uri.replace('sqlite:///', '')
+    
+    # Si no tiene 'instance/' al inicio, agregarlo
+    if not db_path_relative.startswith('instance/'):
+        # Flask usa instance/ por defecto
+        db_path = os.path.join('instance', os.path.basename(db_path_relative))
+    else:
+        db_path = db_path_relative
+else:
+    db_path = 'instance/database.db'  # Fallback seguro
+
+backup_manager = BackupManager(app, db_path)
+app.logger.info(f"📦 BackupManager inicializado con ruta: {db_path}")
 
 # Importar servicio de correos
 from email_service import mail, enviar_confirmacion_pago, enviar_recordatorio_pago, enviar_aviso_vencimiento
@@ -903,104 +922,189 @@ def test_correo():
         flash(f'❌ Error: {str(e)}', 'danger')
     
     return redirect(url_for('configuracion'))
+# ============================================
+# REEMPLAZAR LAS RUTAS DE BACKUP EXISTENTES
+# ============================================
+
 @app.route('/backup/info')
+@requiere_licencia
 def backup_info():
-    """Info de BD - Ruta correcta con instance/"""
+    """Obtiene información de la base de datos actual"""
     try:
-        # ✅ RUTA CORRECTA: instance/database.db
-        db_path = os.path.join('instance', 'database.db')
+        info = backup_manager.obtener_info_bd()
         
-        app.logger.info(f"🔍 Buscando BD en: {db_path}")
-        
-        if os.path.exists(db_path):
-            size_mb = round(os.path.getsize(db_path) / (1024 * 1024), 2)
-            from datetime import datetime
-            mtime = os.path.getmtime(db_path)
-            fecha = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-            
-            app.logger.info(f"✅ BD encontrada: {size_mb} MB")
-            
+        if info:
             return jsonify({
                 'success': True,
                 'info': {
-                    'nombre': 'database.db',
-                    'tamano_mb': size_mb,
-                    'fecha_modificacion': fecha
+                    'nombre': info['nombre'],
+                    'tamano_mb': info['tamano_mb'],
+                    'fecha_modificacion': info['fecha_modificacion_str']
                 }
             })
         else:
-            app.logger.error(f"❌ Archivo no existe en: {db_path}")
-            return jsonify({'success': False, 'error': f'BD no encontrada'}), 404
+            app.logger.error("Base de datos no encontrada")
+            return jsonify({
+                'success': False, 
+                'error': 'Base de datos no encontrada'
+            }), 404
             
     except Exception as e:
-        app.logger.error(f"❌ Error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        app.logger.error(f"Error obteniendo info de BD: {e}")
+        return jsonify({
+            'success': False, 
+            'error': str(e)
+        }), 500
 
-#________________________
+
 @app.route('/backup/descargar')
 @requiere_licencia
 def descargar_bd():
-    """Descargar BD"""
-    db_path = os.path.join('instance', 'database.db')
-    
-    if not os.path.exists(db_path):
-        flash('❌ BD no encontrada', 'danger')
+    """Descarga un backup de la base de datos"""
+    try:
+        # Crear backup temporal
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        nombre_backup = f"backup_{timestamp}.db"
+        
+        success, mensaje, ruta_backup = backup_manager.crear_backup_temporal(nombre_backup)
+        
+        if not success:
+            flash(mensaje, 'danger')
+            return redirect(url_for('configuracion'))
+        
+        # Enviar archivo
+        return send_file(
+            ruta_backup,
+            as_attachment=True,
+            download_name=nombre_backup
+        )
+        
+    except Exception as e:
+        app.logger.error(f"Error descargando backup: {e}")
+        flash(f'Error al descargar backup: {str(e)}', 'danger')
         return redirect(url_for('configuracion'))
-    
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    return send_file(db_path, as_attachment=True, 
-                     download_name=f"backup_{timestamp}.db")
 
 
 @app.route('/backup/subir', methods=['POST'])
 @requiere_licencia
 def subir_bd():
-    """Restaurar BD"""
-    archivo = request.files.get('archivo_bd')
-    
-    if not archivo or not archivo.filename.endswith('.db'):
-        flash('❌ Archivo inválido', 'danger')
-        return redirect(url_for('configuracion'))
-    
-    db_path = os.path.join('instance', 'database.db')
-    
+    """Restaura la base de datos desde un archivo subido"""
     try:
-        # Cerrar conexiones
+        archivo = request.files.get('archivo_bd')
+        
+        if not archivo:
+            flash('No se seleccionó ningún archivo', 'danger')
+            return redirect(url_for('configuracion'))
+        
+        if not archivo.filename.endswith('.db'):
+            flash('El archivo debe tener extensión .db', 'danger')
+            return redirect(url_for('configuracion'))
+        
+        # Cerrar todas las conexiones de la base de datos
         db.session.remove()
         db.engine.dispose()
         
-        # Backup de seguridad
-        if os.path.exists(db_path):
-            import shutil
-            backup = db_path + f".backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            shutil.copy2(db_path, backup)
+        # Restaurar desde archivo
+        success, mensaje = backup_manager.restaurar_desde_archivo(archivo)
         
-        # Guardar nuevo archivo
-        archivo.save(db_path)
+        if not success:
+            flash(mensaje, 'danger')
+            return redirect(url_for('configuracion'))
         
-        # Reiniciar conexión
+        # Reiniciar conexión a la base de datos
         db.engine.dispose()
         
-        flash('✅ BD restaurada. La página se recargará en 2 segundos...', 'success')
-        
-        # Redirigir con JavaScript para recargar
+        # Página de éxito con recarga automática
         return f"""
+        <!DOCTYPE html>
         <html>
         <head>
-            <meta http-equiv="refresh" content="2;url={url_for('index')}">
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="3;url={url_for('index')}">
+            <title>Restauración Exitosa</title>
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    text-align: center;
+                    padding: 50px;
+                    background: #f5f5f5;
+                }}
+                .container {{
+                    background: white;
+                    padding: 40px;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    max-width: 500px;
+                    margin: 0 auto;
+                }}
+                .success-icon {{
+                    font-size: 60px;
+                    color: #28a745;
+                    margin-bottom: 20px;
+                }}
+                h2 {{
+                    color: #333;
+                    margin-bottom: 15px;
+                }}
+                p {{
+                    color: #666;
+                    margin-bottom: 10px;
+                }}
+                a {{
+                    color: #007bff;
+                    text-decoration: none;
+                }}
+                a:hover {{
+                    text-decoration: underline;
+                }}
+                .spinner {{
+                    display: inline-block;
+                    width: 20px;
+                    height: 20px;
+                    border: 3px solid rgba(0,0,0,.1);
+                    border-radius: 50%;
+                    border-top-color: #007bff;
+                    animation: spin 1s ease-in-out infinite;
+                }}
+                @keyframes spin {{
+                    to {{ transform: rotate(360deg); }}
+                }}
+            </style>
         </head>
-        <body style="font-family: Arial; text-align: center; padding: 50px;">
-            <h2>✅ Base de datos restaurada exitosamente</h2>
-            <p>Recargando en 2 segundos...</p>
-            <p><a href="{url_for('index')}">Haz clic aquí si no se recarga automáticamente</a></p>
+        <body>
+            <div class="container">
+                <div class="success-icon">✅</div>
+                <h2>Base de datos restaurada exitosamente</h2>
+                <p>La página se recargará automáticamente en 3 segundos...</p>
+                <div class="spinner"></div>
+                <p style="margin-top: 20px;">
+                    <a href="{url_for('index')}">Haz clic aquí si no se recarga automáticamente</a>
+                </p>
+            </div>
         </body>
         </html>
         """
         
     except Exception as e:
-        app.logger.error(f"❌ Error: {e}")
-        flash(f'❌ Error: {str(e)}', 'danger')
+        app.logger.error(f"Error restaurando backup: {e}")
+        flash(f'Error al restaurar backup: {str(e)}', 'danger')
         return redirect(url_for('configuracion'))
+
+
+# ============================================
+# TAREA PROGRAMADA: LIMPIAR BACKUPS ANTIGUOS
+# ============================================
+
+@app.cli.command()
+def limpiar_backups():
+    """Limpia backups temporales antiguos (más de 1 hora)"""
+    try:
+        backup_manager.limpiar_backups_temporales()
+        print("✅ Backups temporales limpiados")
+    except Exception as e:
+        print(f"❌ Error limpiando backups: {e}")
+
+
 # ============================================
 # UTILIDADES - RECORDATORIOS
 # ============================================
@@ -1329,6 +1433,18 @@ def abrir_navegador(url, delay=2):
         webbrowser.open(url)
     except:
         pass
+# Programar limpieza periódica de backups (opcional)
+import atexit
+
+def limpiar_backups_al_cerrar():
+    """Limpia backups temporales al cerrar la aplicación"""
+    try:
+        backup_manager.limpiar_backups_temporales()
+        app.logger.info("🗑️ Backups temporales limpiados al cerrar")
+    except Exception as e:
+        app.logger.error(f"Error limpiando backups al cerrar: {e}")
+
+atexit.register(limpiar_backups_al_cerrar)
 
 if __name__ == '__main__':
     import threading
