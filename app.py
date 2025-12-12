@@ -223,7 +223,9 @@ class Pago(db.Model):
     def __repr__(self):
         return f'<Pago ${self.monto} - {self.cliente.nombre_completo}>'
 
-
+with app.app_context():
+        db.create_all()
+        app.logger.info("Tablas verificadas/creadas")
 # ============================================
 # DECORADORES Y UTILIDADES
 # ============================================
