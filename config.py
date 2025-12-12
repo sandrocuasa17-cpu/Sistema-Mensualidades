@@ -39,9 +39,13 @@ class Config:
     SESSION_TYPE = 'filesystem'
     PERMANENT_SESSION_LIFETIME = 3600  # 1 hora
     
-    # === CONFIGURACIÓN DE UPLOADS (para futuro) ===
+    # === CONFIGURACIÓN DE UPLOADS ===
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max
     UPLOAD_FOLDER = BASE_DIR / 'uploads'
+    
+    # === BACKUP DE BASE DE DATOS ===
+    BACKUP_DIR = BASE_DIR / 'backups'
+    MAX_BACKUPS = 10  # Número máximo de backups temporales a mantener
     
     # === PAGINACIÓN ===
     ITEMS_PER_PAGE = 20
@@ -67,6 +71,7 @@ class Config:
         # Crear directorios necesarios
         Config.UPLOAD_FOLDER.mkdir(exist_ok=True)
         Config.LOG_FILE.parent.mkdir(exist_ok=True)
+        Config.BACKUP_DIR.mkdir(exist_ok=True)  # ✅ Crear carpeta de backups
 
 
 class DevelopmentConfig(Config):
