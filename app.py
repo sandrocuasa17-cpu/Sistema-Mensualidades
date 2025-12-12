@@ -14,6 +14,9 @@ from logging.handlers import RotatingFileHandler
 import os
 from datetime import datetime, timedelta
 import sys
+from flask import send_file
+from werkzeug.utils import secure_filename
+
 
 # Importar configuración centralizada
 from config import get_config
@@ -29,6 +32,7 @@ app.config.from_object(get_config(env))
 # Inicializar extensiones
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+
 
 # Importar servicio de correos
 from email_service import mail, enviar_confirmacion_pago, enviar_recordatorio_pago, enviar_aviso_vencimiento
@@ -200,13 +204,7 @@ class Pago(db.Model):
     def __repr__(self):
         return f'<Pago ${self.monto} - {self.cliente.nombre_completo}>'
 
-# 🔹 IMPORTANTE: crear tablas si no existen (también en Render)
-with app.app_context():
-    try:
-        db.create_all()
-        app.logger.info("✅ Tablas de la base de datos verificadas/creadas")
-    except Exception as e:
-        app.logger.error(f"❌ Error inicializando la base de datos: {e}")
+
 # ============================================
 # DECORADORES Y UTILIDADES
 # ============================================
@@ -905,6 +903,104 @@ def test_correo():
         flash(f'❌ Error: {str(e)}', 'danger')
     
     return redirect(url_for('configuracion'))
+@app.route('/backup/info')
+def backup_info():
+    """Info de BD - Ruta correcta con instance/"""
+    try:
+        # ✅ RUTA CORRECTA: instance/database.db
+        db_path = os.path.join('instance', 'database.db')
+        
+        app.logger.info(f"🔍 Buscando BD en: {db_path}")
+        
+        if os.path.exists(db_path):
+            size_mb = round(os.path.getsize(db_path) / (1024 * 1024), 2)
+            from datetime import datetime
+            mtime = os.path.getmtime(db_path)
+            fecha = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+            
+            app.logger.info(f"✅ BD encontrada: {size_mb} MB")
+            
+            return jsonify({
+                'success': True,
+                'info': {
+                    'nombre': 'database.db',
+                    'tamano_mb': size_mb,
+                    'fecha_modificacion': fecha
+                }
+            })
+        else:
+            app.logger.error(f"❌ Archivo no existe en: {db_path}")
+            return jsonify({'success': False, 'error': f'BD no encontrada'}), 404
+            
+    except Exception as e:
+        app.logger.error(f"❌ Error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+#________________________
+@app.route('/backup/descargar')
+@requiere_licencia
+def descargar_bd():
+    """Descargar BD"""
+    db_path = os.path.join('instance', 'database.db')
+    
+    if not os.path.exists(db_path):
+        flash('❌ BD no encontrada', 'danger')
+        return redirect(url_for('configuracion'))
+    
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    return send_file(db_path, as_attachment=True, 
+                     download_name=f"backup_{timestamp}.db")
+
+
+@app.route('/backup/subir', methods=['POST'])
+@requiere_licencia
+def subir_bd():
+    """Restaurar BD"""
+    archivo = request.files.get('archivo_bd')
+    
+    if not archivo or not archivo.filename.endswith('.db'):
+        flash('❌ Archivo inválido', 'danger')
+        return redirect(url_for('configuracion'))
+    
+    db_path = os.path.join('instance', 'database.db')
+    
+    try:
+        # Cerrar conexiones
+        db.session.remove()
+        db.engine.dispose()
+        
+        # Backup de seguridad
+        if os.path.exists(db_path):
+            import shutil
+            backup = db_path + f".backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            shutil.copy2(db_path, backup)
+        
+        # Guardar nuevo archivo
+        archivo.save(db_path)
+        
+        # Reiniciar conexión
+        db.engine.dispose()
+        
+        flash('✅ BD restaurada. La página se recargará en 2 segundos...', 'success')
+        
+        # Redirigir con JavaScript para recargar
+        return f"""
+        <html>
+        <head>
+            <meta http-equiv="refresh" content="2;url={url_for('index')}">
+        </head>
+        <body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h2>✅ Base de datos restaurada exitosamente</h2>
+            <p>Recargando en 2 segundos...</p>
+            <p><a href="{url_for('index')}">Haz clic aquí si no se recarga automáticamente</a></p>
+        </body>
+        </html>
+        """
+        
+    except Exception as e:
+        app.logger.error(f"❌ Error: {e}")
+        flash(f'❌ Error: {str(e)}', 'danger')
+        return redirect(url_for('configuracion'))
 # ============================================
 # UTILIDADES - RECORDATORIOS
 # ============================================
@@ -1239,13 +1335,49 @@ if __name__ == '__main__':
     
     ejecutable = es_ejecutable()
     
+    # ✅ INICIALIZACIÓN INTELIGENTE DE BASE DE DATOS
     with app.app_context():
-        db.create_all()
-        if not ejecutable:
-            print("=" * 60)
-            print("🚀 SISTEMA DE GESTIÓN DE MENSUALIDADES")
-            print("=" * 60)
-            app.logger.info('Base de datos verificada')
+        try:
+            # Obtener ruta real de la base de datos
+            db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+            db_path = db_uri.replace('sqlite:///', '')
+            db_existe = os.path.exists(db_path)
+            
+            if db_existe:
+                # ✅ Base de datos YA EXISTE - Solo verificar estructura
+                app.logger.info(f"✅ Base de datos existente detectada: {db_path}")
+                app.logger.info("🔍 Verificando estructura de tablas...")
+                
+                # db.create_all() es INTELIGENTE:
+                # - Solo crea tablas que NO existen
+                # - NO borra datos existentes
+                # - NO sobrescribe tablas existentes
+                db.create_all()
+                
+                app.logger.info("✅ Estructura verificada - Datos preservados")
+                
+            else:
+                # 🆕 NO EXISTE - Crear nueva base de datos
+                app.logger.info(f"🆕 Creando nueva base de datos en: {db_path}")
+                db.create_all()
+                app.logger.info("✅ Nueva base de datos creada exitosamente")
+                
+                # Opcional: Crear configuración inicial
+                try:
+                    # Verificar si ya existe configuración
+                    config_existe = Configuracion.query.first()
+                    
+                    if not config_existe:
+                        # Crear configuración inicial solo si no existe
+                        Configuracion.establecer('SISTEMA_INICIALIZADO', 'true', 'Sistema inicializado correctamente')
+                        app.logger.info("✅ Configuración inicial creada")
+                except Exception as e:
+                    app.logger.warning(f"⚠️ No se pudo crear configuración inicial: {e}")
+                    
+        except Exception as e:
+            app.logger.error(f"❌ Error inicializando la base de datos: {e}")
+            import traceback
+            app.logger.error(traceback.format_exc())
     
     # Configurar host y puerto
     host = '127.0.0.1'
