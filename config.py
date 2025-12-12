@@ -22,7 +22,7 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or os.urandom(24).hex()
     
     # === BASE DE DATOS ===
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or f"sqlite:///{(BASE_DIR / 'instance' / 'database.db')}¨
+    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL") or f"sqlite:///{os.path.join('instance' , 'database.db')}¨
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = False  # Cambiar a True para debug
     
@@ -116,4 +116,5 @@ def get_config(env=None):
     if env is None:
         env = os.environ.get('FLASK_ENV', 'development')
     return config.get(env, config['default'])
+
 
