@@ -226,6 +226,172 @@
 </div>
 {% endif %}
 
+<!-- Sistema de Backup de Base de Datos -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card border-primary">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-database-fill-gear"></i> Backup de Base de Datos
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Información importante -->
+                <div class="alert alert-warning">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-exclamation-triangle-fill"></i> 
+                        <strong>MUY IMPORTANTE:</strong>
+                    </h6>
+                    <ol class="mb-0">
+                        <li><strong>Antes de actualizar:</strong> Descarga tu base de datos como respaldo</li>
+                        <li><strong>Si algo sale mal:</strong> Sube el archivo descargado para restaurar tus datos</li>
+                        <li><strong>Guarda el archivo .db:</strong> En un lugar seguro (Google Drive, Dropbox, etc.)</li>
+                    </ol>
+                </div>
+                
+                <!-- Información de la BD actual -->
+                <div class="card mb-3" style="background: #f8f9fa;">
+                    <div class="card-body">
+                        <h6 class="mb-3">
+                            <i class="bi bi-info-circle"></i> Base de Datos Actual:
+                        </h6>
+                        <div id="db-info-loading" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                            <span class="ms-2">Cargando información...</span>
+                        </div>
+                        <div id="db-info-content" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <p class="mb-2">
+                                        <i class="bi bi-file-earmark-text"></i> 
+                                        <strong>Archivo:</strong> 
+                                        <span id="db-nombre" class="text-primary"></span>
+                                    </p>
+                                </div>
+                                <div class="col-md-4">
+                                    <p class="mb-2">
+                                        <i class="bi bi-hdd"></i> 
+                                        <strong>Tamaño:</strong> 
+                                        <span id="db-tamano" class="text-success"></span>
+                                    </p>
+                                </div>
+                                <div class="col-md-4">
+                                    <p class="mb-2">
+                                        <i class="bi bi-calendar-check"></i> 
+                                        <strong>Última modificación:</strong> 
+                                        <span id="db-fecha"></span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Acciones de backup -->
+                <div class="row">
+                    <!-- Descargar BD -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-success">
+                            <div class="card-body text-center">
+                                <i class="bi bi-download" style="font-size: 48px; color: #198754;"></i>
+                                <h5 class="mt-3 mb-3">Descargar Base de Datos</h5>
+                                <p class="text-muted mb-3">
+                                    Descarga tu base de datos actual como respaldo antes de cualquier actualización
+                                </p>
+                                <a href="{{ url_for('descargar_bd') }}" 
+                                   class="btn btn-success btn-lg w-100">
+                                    <i class="bi bi-cloud-download"></i> 
+                                    Descargar Ahora (.db)
+                                </a>
+                                <small class="d-block mt-2 text-muted">
+                                    El archivo se descargará con fecha y hora actual
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Subir/Restaurar BD -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-warning">
+                            <div class="card-body text-center">
+                                <i class="bi bi-upload" style="font-size: 48px; color: #ffc107;"></i>
+                                <h5 class="mt-3 mb-3">Restaurar Base de Datos</h5>
+                                <p class="text-muted mb-3">
+                                    Sube un archivo .db previamente descargado para restaurar tus datos
+                                </p>
+                                
+                                <form method="POST" 
+                                      action="{{ url_for('subir_bd') }}" 
+                                      enctype="multipart/form-data"
+                                      id="form-restaurar"
+                                      onsubmit="return confirmarRestauracion(event)">
+                                    <div class="mb-3">
+                                        <input type="file" 
+                                               class="form-control" 
+                                               id="archivo_bd" 
+                                               name="archivo_bd"
+                                               accept=".db"
+                                               required>
+                                    </div>
+                                    <button type="submit" class="btn btn-warning btn-lg w-100" id="btn-restaurar">
+                                        <i class="bi bi-cloud-upload"></i> 
+                                        Restaurar Base de Datos
+                                    </button>
+                                </form>
+                                
+                                <small class="d-block mt-2 text-danger">
+                                    ⚠️ Esto sobrescribirá la base de datos actual
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Instrucciones detalladas -->
+                <div class="accordion mt-4" id="instruccionesBackup">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" 
+                                    data-bs-toggle="collapse" data-bs-target="#collapseInstrucciones">
+                                <i class="bi bi-question-circle me-2"></i>
+                                <strong>¿Cómo usar el sistema de backup?</strong>
+                            </button>
+                        </h2>
+                        <div id="collapseInstrucciones" class="accordion-collapse collapse" 
+                             data-bs-parent="#instruccionesBackup">
+                            <div class="accordion-body">
+                                <h6><strong>📥 Antes de actualizar:</strong></h6>
+                                <ol>
+                                    <li>Haz clic en "Descargar Ahora"</li>
+                                    <li>Guarda el archivo .db en un lugar seguro (tu computadora, Google Drive, etc.)</li>
+                                    <li>Anota la fecha y hora del backup</li>
+                                    <li>Procede con tu actualización</li>
+                                </ol>
+                                
+                                <h6 class="mt-4"><strong>📤 Si necesitas restaurar:</strong></h6>
+                                <ol>
+                                    <li>Haz clic en "Examinar" y selecciona tu archivo .db</li>
+                                    <li>Confirma la restauración</li>
+                                    <li>El sistema creará un backup de seguridad automático antes de restaurar</li>
+                                    <li>La aplicación se recargará con los datos restaurados</li>
+                                </ol>
+                                
+                                <div class="alert alert-info mt-3 mb-0">
+                                    <i class="bi bi-lightbulb"></i> 
+                                    <strong>Consejo:</strong> Descarga un backup antes de cada deploy. 
+                                    Los archivos .db son pequeños y fáciles de guardar.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Configuración de Correo Electrónico -->
 <div class="row mb-4">
     <div class="col-md-12">
@@ -388,5 +554,72 @@
         location.reload();
     }, 60000); // Recargar cada minuto
     {% endif %}
+    
+    // ====================================
+    // SISTEMA DE BACKUP
+    // ====================================
+    
+    // Cargar información de la base de datos
+    function cargarInfoBD() {
+        fetch('{{ url_for("backup_info") }}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('db-nombre').textContent = data.info.nombre;
+                    document.getElementById('db-tamano').textContent = data.info.tamano_mb + ' MB';
+                    document.getElementById('db-fecha').textContent = data.info.fecha_modificacion;
+                    
+                    document.getElementById('db-info-loading').style.display = 'none';
+                    document.getElementById('db-info-content').style.display = 'block';
+                } else {
+                    document.getElementById('db-info-loading').innerHTML = 
+                        '<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> Error cargando información</span>';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('db-info-loading').innerHTML = 
+                    '<span class="text-danger"><i class="bi bi-exclamation-triangle"></i> Error de conexión</span>';
+            });
+    }
+    
+    // Confirmar restauración
+    function confirmarRestauracion(event) {
+        const archivo = document.getElementById('archivo_bd').files[0];
+        
+        if (!archivo) {
+            alert('❌ Por favor selecciona un archivo');
+            return false;
+        }
+        
+        if (!archivo.name.endsWith('.db')) {
+            alert('❌ El archivo debe tener extensión .db');
+            return false;
+        }
+        
+        const confirmacion = confirm(
+            '⚠️ ADVERTENCIA ⚠️\n\n' +
+            '¿Estás seguro de restaurar la base de datos?\n\n' +
+            '• Se sobrescribirá la base de datos actual\n' +
+            '• Se creará un backup de seguridad automático\n' +
+            '• La aplicación se recargará\n\n' +
+            'Archivo seleccionado: ' + archivo.name + '\n' +
+            'Tamaño: ' + (archivo.size / (1024 * 1024)).toFixed(2) + ' MB'
+        );
+        
+        if (confirmacion) {
+            // Mostrar mensaje de espera
+            const btnSubmit = document.getElementById('btn-restaurar');
+            btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Restaurando...';
+            btnSubmit.disabled = true;
+        }
+        
+        return confirmacion;
+    }
+    
+    // Cargar info BD al cargar la página
+    document.addEventListener('DOMContentLoaded', function() {
+        cargarInfoBD();
+    });
 </script>
 {% endblock %}
