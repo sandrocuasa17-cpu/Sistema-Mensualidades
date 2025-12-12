@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Configuración Centralizada del Sistema
-Todas las configuraciones deben estar aquí
+✅ COMPATIBLE CON RENDER (PostgreSQL + SQLite local)
 """
 
 import os
@@ -35,13 +35,32 @@ class Config:
     LOG_FILE = LOG_DIR / "app.log"
 
     # === BASE DE DATOS ===
-    # Render / producción: usa DATABASE_URL (Postgres) si existe.
-    # Local o fallback: SQLite en instance/database.db (se crea carpeta y archivo si faltan).
-    _default_sqlite = f"sqlite:///{(INSTANCE_DIR / 'database.db').as_posix()}"
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", _default_sqlite)
+    # ✅ FIX: Manejo correcto de DATABASE_URL de Render
+    _db_url = os.environ.get("DATABASE_URL")
+    
+    if _db_url:
+        # Render usa postgres://, pero SQLAlchemy necesita postgresql://
+        if _db_url.startswith("postgres://"):
+            _db_url = _db_url.replace("postgres://", "postgresql://", 1)
+        SQLALCHEMY_DATABASE_URI = _db_url
+    else:
+        # Desarrollo local: SQLite
+        SQLALCHEMY_DATABASE_URI = f"sqlite:///{(INSTANCE_DIR / 'database.db').as_posix()}"
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ECHO = False  # Cambiar a True para debug
+    SQLALCHEMY_ECHO = False
+
+    # === DETECCIÓN DE ENTORNO ===
+    @staticmethod
+    def is_production():
+        """Detecta si estamos en producción (Render)"""
+        return os.environ.get("DATABASE_URL") is not None
+    
+    @staticmethod
+    def is_sqlite():
+        """Detecta si la base de datos es SQLite"""
+        db_uri = Config.SQLALCHEMY_DATABASE_URI
+        return db_uri.startswith("sqlite://")
 
     # === CORREO ELECTRÓNICO ===
     MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
@@ -54,19 +73,21 @@ class Config:
 
     # === CONFIGURACIÓN DE SESIÓN ===
     SESSION_TYPE = "filesystem"
-    PERMANENT_SESSION_LIFETIME = 3600  # 1 hora
+    PERMANENT_SESSION_LIFETIME = 3600
 
     # === CONFIGURACIÓN DE UPLOADS ===
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
 
     # === BACKUP DE BASE DE DATOS ===
-    MAX_BACKUPS = 10  # Número máximo de backups temporales a mantener
+    MAX_BACKUPS = 10
+    # ✅ NUEVO: Deshabilitar backups en producción (solo funciona con SQLite)
+    ENABLE_DATABASE_BACKUPS = not is_production.__func__()
 
     # === PAGINACIÓN ===
     ITEMS_PER_PAGE = 20
 
     # === TIMEZONE ===
-    TIMEZONE = "America/Guayaquil"  # Ecuador
+    TIMEZONE = "America/Guayaquil"
 
     # === DEMO ===
     DEMO_DURATION_MINUTES = 30
@@ -81,8 +102,7 @@ class Config:
 
     @staticmethod
     def init_app(app):
-        """Inicializar configuraciones adicionales (carpetas, etc.)"""
-        # Asegurar que las carpetas existan en runtime (Render también)
+        """Inicializar configuraciones adicionales"""
         _ensure_dir(Config.INSTANCE_DIR)
         _ensure_dir(Config.UPLOAD_FOLDER)
         _ensure_dir(Config.BACKUP_DIR)
@@ -90,34 +110,30 @@ class Config:
 
 
 class DevelopmentConfig(Config):
-    """Configuración para desarrollo"""
     DEBUG = True
     TESTING = False
     SQLALCHEMY_ECHO = True
 
 
 class ProductionConfig(Config):
-    """Configuración para producción"""
     DEBUG = False
     TESTING = False
+    SQLALCHEMY_ECHO = False
 
-    # En producción, SECRET_KEY DEBE venir de variable de entorno
     @property
     def SECRET_KEY(self):
         secret = os.environ.get("SECRET_KEY")
         if not secret:
-            raise ValueError("SECRET_KEY must be set in production!")
+            raise ValueError("❌ SECRET_KEY debe estar configurada en producción!")
         return secret
 
 
 class TestingConfig(Config):
-    """Configuración para testing"""
     TESTING = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     WTF_CSRF_ENABLED = False
 
 
-# Diccionario de configuraciones
 config = {
     "development": DevelopmentConfig,
     "production": ProductionConfig,
@@ -129,5 +145,10 @@ config = {
 def get_config(env=None):
     """Obtiene la configuración según el entorno"""
     if env is None:
-        env = os.environ.get("FLASK_ENV", "development")
-    return config.get(env, config["default
+        # Si existe DATABASE_URL, asumir producción
+        if os.environ.get("DATABASE_URL"):
+            env = "production"
+        else:
+            env = os.environ.get("FLASK_ENV", "development")
+    
+    return config.get(env, config["default"])
