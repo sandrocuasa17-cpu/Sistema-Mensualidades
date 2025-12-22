@@ -2,11 +2,15 @@ Flask==2.3.3
 Flask-SQLAlchemy==3.1.1
 Flask-Migrate==4.0.5
 Flask-Mail==0.9.1
-python-dotenv==1.0.1
-gunicorn==21.2.0
+
 SQLAlchemy==2.0.23
 Werkzeug==2.3.7
+
+python-dotenv==1.0.1
+
+gunicorn==21.2.0
+
 openpyxl==3.1.2
 reportlab==4.0.8
-psycopg2-binary==2.9.9
 
+psycopg2-binary==2.9.9
