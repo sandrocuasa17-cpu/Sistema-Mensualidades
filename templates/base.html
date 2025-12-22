@@ -81,11 +81,11 @@
                 <i class="bi bi-credit-card"></i>
                 Pagos
             </a>
-            <a class="nav-link {% if request.endpoint in ['planes', 'plan_nuevo', 'plan_editar'] %}active{% endif %}" 
-               href="{{ url_for('planes') }}"
-               aria-current="{% if request.endpoint in ['planes', 'plan_nuevo', 'plan_editar'] %}page{% endif %}">
-                <i class="bi bi-tags"></i>
-                Planes
+            <a class="nav-link {% if request.endpoint in ['cursos', 'curso_nuevo', 'curso_editar'] %}active{% endif %}" 
+               href="{{ url_for('cursos') }}"
+               aria-current="{% if request.endpoint in ['cursos', 'curso_nuevo', 'curso_editar'] %}page{% endif %}">
+                <i class="bi bi-book-fill"></i>
+                Cursos
             </a>
             
             <hr style="border-color: rgba(255,255,255,0.2); margin: 15px 0;">
@@ -101,7 +101,7 @@
     
     <!-- Main Content -->
     <main class="main-content" id="main-content" role="main">
-        <!-- Flash Messages -->
+        <!-- ✅ FLASH MESSAGES MEJORADOS (SOPORTAN MULTILÍNEA) -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
@@ -115,7 +115,10 @@
                         {% elif category == 'info' %}
                             <i class="bi bi-info-circle-fill"></i>
                         {% endif %}
-                        {{ message }}
+                        
+                        <!-- ✅ SOPORTE MULTILÍNEA: Convierte \n en <br> -->
+                        <span style="white-space: pre-wrap;">{{ message|replace('\n', '<br>')|safe }}</span>
+                        
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar alerta"></button>
                     </div>
                 {% endfor %}

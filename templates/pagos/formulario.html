@@ -9,42 +9,59 @@
 </div>
 
 <div class="row">
-    <div class="col-md-8 mx-auto">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title"><i class="bi bi-cash-stack"></i> Datos del Pago</h5>
-            </div>
+    <div class="col-lg-8 mx-auto">
+        <!-- Info del Cliente -->
+        <div class="card mb-4" style="border-left: 5px solid #667eea;">
             <div class="card-body">
-                <!-- Info del Cliente -->
-                <div class="alert alert-info">
-                    <div class="row align-items-center">
-                        <div class="col-md-8">
-                            <h5 class="mb-1">
-                                <i class="bi bi-person-circle"></i> {{ cliente.nombre_completo }}
-                            </h5>
-                            <small>
-                                {% if cliente.plan %}
-                                    Plan: <strong>{{ cliente.plan.nombre }}</strong> - 
-                                    ${{ "%.2f"|format(cliente.plan.precio) }}
-                                {% else %}
-                                    Sin plan asignado
-                                {% endif %}
-                            </small>
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h4 class="mb-2">
+                            <i class="bi bi-person-circle text-primary"></i> 
+                            {{ cliente.nombre_completo }}
+                        </h4>
+                        <div class="mb-2">
+                            <small class="text-muted"><i class="bi bi-envelope"></i> {{ cliente.email }}</small>
                         </div>
-                        <div class="col-md-4 text-end">
-                            <small class="text-muted d-block">Saldo Pendiente</small>
-                            <h4 class="mb-0 {% if cliente.saldo_pendiente > 0 %}text-danger{% else %}text-success{% endif %}">
+                        {% if cliente.telefono %}
+                        <div class="mb-2">
+                            <small class="text-muted"><i class="bi bi-phone"></i> {{ cliente.telefono }}</small>
+                        </div>
+                        {% endif %}
+                        {% if cliente.curso %}
+                        <div class="mt-2">
+                            <span class="badge bg-info" style="font-size: 13px;">
+                                <i class="bi bi-book"></i> {{ cliente.curso.nombre }}
+                            </span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <div class="text-center p-3" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 10px; color: white;">
+                            <small class="d-block mb-1" style="opacity: 0.9;">Saldo Pendiente</small>
+                            <h2 class="mb-0 fw-bold">
                                 ${{ "%.2f"|format(cliente.saldo_pendiente) }}
-                            </h4>
+                            </h2>
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
 
-                <form method="POST">
+        <!-- Formulario de Pago -->
+        <div class="card">
+            <div class="card-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+                <h5 class="mb-0">
+                    <i class="bi bi-cash-stack"></i> Datos del Pago
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="formPago">
                     <!-- Monto -->
-                    <div class="mb-3">
-                        <label for="monto" class="form-label">Monto a Pagar *</label>
-                        <div class="input-group">
+                    <div class="mb-4">
+                        <label for="monto" class="form-label">
+                            <i class="bi bi-currency-dollar"></i> Monto a Pagar *
+                        </label>
+                        <div class="input-group input-group-lg">
                             <span class="input-group-text">$</span>
                             <input type="number" 
                                    class="form-control" 
@@ -52,26 +69,38 @@
                                    name="monto" 
                                    step="0.01" 
                                    min="0.01"
-                                   value="{{ cliente.plan.precio if cliente.plan else '' }}"
+                                   value="{{ cliente.curso.precio_mensual if cliente.curso else '' }}"
                                    required
                                    autofocus>
                         </div>
-                        {% if cliente.plan %}
-                        <small class="text-muted">
-                            Monto sugerido: ${{ "%.2f"|format(cliente.plan.precio) }}
-                        </small>
+                        {% if cliente.curso %}
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> 
+                            Monto sugerido (mensualidad): <strong class="text-success">${{ "%.2f"|format(cliente.curso.precio_mensual) }}</strong>
+                        </div>
+                        {% endif %}
+                        {% if cliente.saldo_pendiente > 0 %}
+                        <div class="alert alert-warning mt-2 py-2">
+                            <small>
+                                <i class="bi bi-exclamation-triangle"></i> 
+                                El estudiante tiene <strong>${{ "%.2f"|format(cliente.saldo_pendiente) }}</strong> pendiente
+                            </small>
+                        </div>
                         {% endif %}
                     </div>
 
                     <div class="row">
                         <!-- Método de Pago -->
                         <div class="col-md-6 mb-3">
-                            <label for="metodo_pago" class="form-label">Método de Pago</label>
+                            <label for="metodo_pago" class="form-label">
+                                <i class="bi bi-credit-card"></i> Método de Pago
+                            </label>
                             <select class="form-select" id="metodo_pago" name="metodo_pago">
                                 <option value="">Seleccionar...</option>
                                 <option value="Efectivo">💵 Efectivo</option>
                                 <option value="Transferencia">🏦 Transferencia Bancaria</option>
                                 <option value="Tarjeta">💳 Tarjeta de Crédito/Débito</option>
+                                <option value="Depósito">🏧 Depósito Bancario</option>
                                 <option value="PayPal">🅿️ PayPal</option>
                                 <option value="Zelle">💸 Zelle</option>
                                 <option value="Otro">📱 Otro</option>
@@ -80,30 +109,38 @@
 
                         <!-- Periodo -->
                         <div class="col-md-6 mb-3">
-                            <label for="periodo" class="form-label">Periodo</label>
+                            <label for="periodo" class="form-label">
+                                <i class="bi bi-calendar-month"></i> Periodo que Cubre
+                            </label>
                             <input type="text" 
                                    class="form-control" 
                                    id="periodo" 
                                    name="periodo" 
-                                   placeholder="Ej: Diciembre 2024">
+                                   placeholder="Ej: Enero 2025">
                             <small class="text-muted">Mes o periodo que cubre este pago</small>
                         </div>
                     </div>
 
                     <!-- Referencia -->
                     <div class="mb-3">
-                        <label for="referencia" class="form-label">Referencia/Comprobante</label>
+                        <label for="referencia" class="form-label">
+                            <i class="bi bi-receipt"></i> Referencia/Comprobante
+                        </label>
                         <input type="text" 
                                class="form-control" 
                                id="referencia" 
                                name="referencia" 
                                placeholder="Número de referencia, comprobante o transacción">
-                        <small class="text-muted">Opcional: número de referencia bancaria, ID de transacción, etc.</small>
+                        <small class="text-muted">
+                            Opcional: número de referencia bancaria, ID de transacción, etc.
+                        </small>
                     </div>
 
                     <!-- Notas -->
-                    <div class="mb-3">
-                        <label for="notas" class="form-label">Notas</label>
+                    <div class="mb-4">
+                        <label for="notas" class="form-label">
+                            <i class="bi bi-chat-left-text"></i> Notas Adicionales
+                        </label>
                         <textarea class="form-control" 
                                   id="notas" 
                                   name="notas" 
@@ -111,14 +148,50 @@
                                   placeholder="Información adicional sobre este pago..."></textarea>
                     </div>
 
+                    <!-- Vista Previa del Pago -->
+                    <div class="card bg-light mb-4" id="vistaPrevia" style="display: none;">
+                        <div class="card-body">
+                            <h6 class="text-primary mb-3">
+                                <i class="bi bi-eye"></i> Vista Previa del Pago
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-2">
+                                        <strong>Estudiante:</strong><br>
+                                        {{ cliente.nombre_completo }}
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Monto:</strong><br>
+                                        <span class="text-success fs-4" id="previewMonto">$0.00</span>
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-2">
+                                        <strong>Método:</strong><br>
+                                        <span id="previewMetodo" class="text-muted">No especificado</span>
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Periodo:</strong><br>
+                                        <span id="previewPeriodo" class="text-muted">No especificado</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Botones -->
-                    <div class="d-flex justify-content-between mt-4">
-                        <a href="{{ url_for('cliente_detalle', id=cliente.id) }}" class="btn btn-secondary">
-                            <i class="bi bi-arrow-left"></i> Cancelar
-                        </a>
-                        <button type="submit" class="btn btn-success btn-lg">
-                            <i class="bi bi-check-circle"></i> Registrar Pago
-                        </button>
+                    <div class="row mt-4">
+                        <div class="col-md-6 mb-2">
+                            <a href="{{ url_for('cliente_detalle', id=cliente.id) }}" 
+                               class="btn btn-secondary btn-lg w-100">
+                                <i class="bi bi-arrow-left"></i> Cancelar
+                            </a>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <button type="submit" class="btn btn-success btn-lg w-100" id="btnSubmit">
+                                <i class="bi bi-check-circle"></i> Registrar Pago
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -128,11 +201,13 @@
         {% if cliente.pagos %}
         <div class="card mt-4">
             <div class="card-header">
-                <h5 class="card-title"><i class="bi bi-clock-history"></i> Últimos Pagos de {{ cliente.nombre }}</h5>
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-clock-history"></i> Últimos Pagos de {{ cliente.nombre }}
+                </h5>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-sm">
+                    <table class="table table-sm table-hover">
                         <thead>
                             <tr>
                                 <th>Fecha</th>
@@ -144,16 +219,37 @@
                         <tbody>
                             {% for pago in cliente.pagos[:5] %}
                             <tr>
-                                <td>{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</td>
-                                <td><span class="badge bg-success">${{ "%.2f"|format(pago.monto) }}</span></td>
-                                <td>{{ pago.metodo_pago or '-' }}</td>
-                                <td>{{ pago.periodo or '-' }}</td>
+                                <td>
+                                    <small>{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">${{ "%.2f"|format(pago.monto) }}</span>
+                                </td>
+                                <td>
+                                    <small>{{ pago.metodo_pago or '-' }}</small>
+                                </td>
+                                <td>
+                                    <small>{{ pago.periodo or '-' }}</small>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td><strong>Total histórico:</strong></td>
+                                <td colspan="3">
+                                    <strong class="text-success">
+                                        ${{ "%.2f"|format(cliente.pagos|sum(attribute='monto')) }}
+                                    </strong>
+                                </td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
-                <small class="text-muted">Mostrando los últimos 5 pagos</small>
+                <small class="text-muted">
+                    <i class="bi bi-info-circle"></i> 
+                    Mostrando los últimos 5 pagos de {{ cliente.pagos|length }} total
+                </small>
             </div>
         </div>
         {% endif %}
@@ -163,25 +259,69 @@
 
 {% block extra_js %}
 <script>
-    // Calcular y mostrar sugerencias
-    document.getElementById('monto').addEventListener('input', function() {
-        const monto = parseFloat(this.value) || 0;
-        const saldoPendiente = {{ cliente.saldo_pendiente }};
+document.addEventListener('DOMContentLoaded', function() {
+    const formPago = document.getElementById('formPago');
+    const montoInput = document.getElementById('monto');
+    const metodoPagoSelect = document.getElementById('metodo_pago');
+    const periodoInput = document.getElementById('periodo');
+    const vistaPrevia = document.getElementById('vistaPrevia');
+    const btnSubmit = document.getElementById('btnSubmit');
+    
+    // Auto-generar periodo actual como sugerencia
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const fecha = new Date();
+    const periodoActual = `${meses[fecha.getMonth()]} ${fecha.getFullYear()}`;
+    periodoInput.placeholder = `Ej: ${periodoActual}`;
+    
+    // Función para actualizar vista previa
+    function actualizarVistaPrevia() {
+        const monto = parseFloat(montoInput.value) || 0;
+        const metodo = metodoPagoSelect.options[metodoPagoSelect.selectedIndex]?.text || 'No especificado';
+        const periodo = periodoInput.value || 'No especificado';
         
-        if (monto > saldoPendiente && saldoPendiente > 0) {
-            console.log('El monto excede el saldo pendiente');
+        if (monto > 0) {
+            document.getElementById('previewMonto').textContent = '$' + monto.toFixed(2);
+            document.getElementById('previewMetodo').textContent = metodo;
+            document.getElementById('previewPeriodo').textContent = periodo;
+            vistaPrevia.style.display = 'block';
+        } else {
+            vistaPrevia.style.display = 'none';
         }
-    });
-
-    // Auto-generar periodo actual
-    document.addEventListener('DOMContentLoaded', function() {
-        const periodoInput = document.getElementById('periodo');
-        if (!periodoInput.value) {
-            const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-                          'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-            const fecha = new Date();
-            periodoInput.placeholder = `Ej: ${meses[fecha.getMonth()]} ${fecha.getFullYear()}`;
+    }
+    
+    // Event listeners para vista previa
+    montoInput.addEventListener('input', actualizarVistaPrevia);
+    metodoPagoSelect.addEventListener('change', actualizarVistaPrevia);
+    periodoInput.addEventListener('input', actualizarVistaPrevia);
+    
+    // Validación antes de enviar
+    formPago.addEventListener('submit', function(e) {
+        const monto = parseFloat(montoInput.value);
+        
+        if (!monto || monto <= 0) {
+            e.preventDefault();
+            alert('❌ El monto debe ser mayor a 0');
+            montoInput.focus();
+            return false;
         }
+        
+        // Confirmar si el monto es muy diferente al sugerido
+        const montoSugerido = {{ cliente.curso.precio_mensual if cliente.curso else 0 }};
+        if (montoSugerido > 0 && Math.abs(monto - montoSugerido) > (montoSugerido * 0.5)) {
+            if (!confirm(`⚠️ El monto ingresado ($${monto.toFixed(2)}) es muy diferente a la mensualidad ($${montoSugerido.toFixed(2)}).\n\n¿Deseas continuar?`)) {
+                e.preventDefault();
+                return false;
+            }
+        }
+        
+        // Deshabilitar botón para evitar doble envío
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Registrando...';
     });
+    
+    // Inicializar vista previa si hay monto predefinido
+    actualizarVistaPrevia();
+});
 </script>
 {% endblock %}

@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard Avanzado - Sistema de Mensualidades{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card-modern {
+        border-radius: 15px;
+        overflow: hidden;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        border: none;
+    }
+    
+    .stat-card-modern:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    }
+    
+    .calendar-day {
+        border-radius: 10px;
+        padding: 15px;
+        background: white;
+        border: 2px solid #e0e0e0;
+        transition: all 0.3s ease;
+    }
+    
+    .calendar-day:hover {
+        border-color: #667eea;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+    }
+    
+    .alert-modern {
+        border-left: 5px solid;
+        border-radius: 10px;
+        animation: slideInRight 0.5s ease;
+    }
+    
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    .badge-xl {
+        font-size: 1.2rem;
+        padding: 0.6rem 1.2rem;
+    }
+    
+    @media print {
+        .no-print {
+            display: none !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h2><i class="bi bi-speedometer2"></i> Dashboard Avanzado</h2>
+            <p class="text-muted mb-0">
+                <i class="bi bi-calendar-event"></i> {{ ahora.strftime('%A, %d de %B de %Y - %H:%M') }}
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            <button class="btn btn-outline-primary no-print" onclick="location.reload()">
+                <i class="bi bi-arrow-clockwise"></i> Actualizar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ALERTAS INTELIGENTES -->
+{% if alertas %}
+<div class="row mb-4">
+    <div class="col-12">
+        {% for alerta in alertas %}
+        <div class="alert alert-{{ alerta.tipo }} alert-modern mb-3" 
+             style="border-left-color: {% if alerta.tipo == 'danger' %}#dc3545{% elif alerta.tipo == 'warning' %}#ffc107{% else %}#17a2b8{% endif %};">
+            <div class="d-flex align-items-center">
+                <div class="me-3" style="font-size: 42px;">
+                    <i class="bi bi-{{ alerta.icono }}"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <h5 class="alert-heading mb-1">{{ alerta.titulo }}</h5>
+                    <p class="mb-2">{{ alerta.mensaje }}</p>
+                    {% if alerta.accion == 'enviar_recordatorios' %}
+                    <a href="{{ url_for('enviar_recordatorios') }}" 
+                       class="btn btn-sm btn-{{ alerta.tipo }}"
+                       onclick="return confirm('¿Enviar recordatorios por correo?')">
+                        <i class="bi bi-envelope-fill"></i> Enviar Recordatorios
+                    </a>
+                    {% elif alerta.accion == 'clientes' %}
+                    <a href="{{ url_for('clientes') }}" class="btn btn-sm btn-{{ alerta.tipo }}">
+                        <i class="bi bi-people-fill"></i> Ver Estudiantes
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ESTADÍSTICAS PRINCIPALES -->
+<div class="row mb-4">
+    <!-- Total Estudiantes -->
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card stat-card-modern h-100" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="card-body text-white">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-2" style="opacity: 0.9;">Estudiantes Activos</h6>
+                        <h2 class="mb-0 fw-bold">{{ total_estudiantes }}</h2>
+                    </div>
+                    <div style="font-size: 48px; opacity: 0.3;">
+                        <i class="bi bi-people-fill"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Al Día -->
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card stat-card-modern h-100" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+            <div class="card-body text-white">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-2" style="opacity: 0.9;">Al Día</h6>
+                        <h2 class="mb-0 fw-bold">{{ al_dia|length }}</h2>
+                        <small style="opacity: 0.9;">{{ "%.1f"|format((al_dia|length / total_estudiantes * 100) if total_estudiantes > 0 else 0) }}%</small>
+                    </div>
+                    <div style="font-size: 48px; opacity: 0.3;">
+                        <i class="bi bi-check-circle-fill"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Críticos -->
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card stat-card-modern h-100" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="card-body text-white">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-2" style="opacity: 0.9;">Críticos (≤3 días)</h6>
+                        <h2 class="mb-0 fw-bold">{{ criticos|length }}</h2>
+                        <small style="opacity: 0.9;">Requieren atención</small>
+                    </div>
+                    <div style="font-size: 48px; opacity: 0.3;">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Vencidos -->
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="card stat-card-modern h-100" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+            <div class="card-body text-white">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-2" style="opacity: 0.9;">Vencidos</h6>
+                        <h2 class="mb-0 fw-bold">{{ vencidos|length }}</h2>
+                        <small style="opacity: 0.9;">Acción urgente</small>
+                    </div>
+                    <div style="font-size: 48px; opacity: 0.3;">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- GRÁFICO DE DISTRIBUCIÓN -->
+<div class="row mb-4">
+    <div class="col-lg-8 mb-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-pie-chart-fill"></i> Distribución de Vencimientos
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="chartVencimientos" height="80"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4 mb-3">
+        <div class="card h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-currency-dollar"></i> Finanzas {{ mes_actual }}
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h6 class="text-muted mb-2">Total Recibido</h6>
+                    <h2 class="text-success mb-0">${{ "%.2f"|format(total_mes_actual) }}</h2>
+                    <small class="text-muted">{{ cantidad_pagos_mes }} pago(s)</small>
+                </div>
+                
+                <div class="mb-4">
+                    <h6 class="text-muted mb-2">Mes Anterior</h6>
+                    <h3 class="mb-0">${{ "%.2f"|format(total_mes_anterior) }}</h3>
+                </div>
+                
+                <div class="mb-4">
+                    <h6 class="text-muted mb-2">Crecimiento</h6>
+                    <h3 class="mb-0 {% if crecimiento_porcentual >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        <i class="bi bi-{% if crecimiento_porcentual >= 0 %}arrow-up{% else %}arrow-down{% endif %}-circle-fill"></i>
+                        {{ "%.1f"|format(crecimiento_porcentual) }}%
+                    </h3>
+                </div>
+                
+                <div class="alert alert-info mb-0">
+                    <small class="mb-0">
+                        <strong>Proyectado (30 días):</strong><br>
+                        ${{ "%.2f"|format(ingresos_proyectados) }}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CALENDARIO DE VENCIMIENTOS -->
+{% if calendario_vencimientos %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-calendar-week"></i> Calendario de Vencimientos - Próximos 7 Días
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for fecha, info in calendario_vencimientos.items() %}
+                    <div class="col-md mb-3">
+                        <div class="calendar-day text-center">
+                            <div class="text-muted small mb-1">{{ info.dia_semana }}</div>
+                            <div class="fw-bold mb-2">{{ info.fecha_display }}</div>
+                            <div class="badge bg-warning text-dark mb-2" style="font-size: 1.2rem;">
+                                {{ info.cantidad }}
+                            </div>
+                            <div class="small text-success fw-bold">
+                                ${{ "%.2f"|format(info.monto_esperado) }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ANÁLISIS POR CURSO -->
+{% if cursos_stats %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-book-fill"></i> Análisis por Curso
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Curso</th>
+                                <th class="text-center">Total</th>
+                                <th class="text-center">Al Día</th>
+                                <th class="text-center">Próximamente</th>
+                                <th class="text-center">Críticos</th>
+                                <th class="text-center">Vencidos</th>
+                                <th class="text-center">Sin Cobertura</th>
+                                <th>Estado General</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for curso_id, stats in cursos_stats.items() %}
+                            <tr>
+                                <td><strong>{{ stats.nombre }}</strong></td>
+                                <td class="text-center"><span class="badge bg-primary">{{ stats.total }}</span></td>
+                                <td class="text-center"><span class="badge bg-success">{{ stats.al_dia }}</span></td>
+                                <td class="text-center"><span class="badge bg-info">{{ stats.proximamente }}</span></td>
+                                <td class="text-center"><span class="badge bg-warning text-dark">{{ stats.criticos }}</span></td>
+                                <td class="text-center"><span class="badge bg-danger">{{ stats.vencidos }}</span></td>
+                                <td class="text-center"><span class="badge bg-secondary">{{ stats.sin_cobertura }}</span></td>
+                                <td>
+                                    <div class="progress" style="height: 25px;">
+                                        {% set al_dia_pct = (stats.al_dia / stats.total * 100) if stats.total > 0 else 0 %}
+                                        <div class="progress-bar bg-success" style="width: {{ al_dia_pct }}%">
+                                            {{ "%.0f"|format(al_dia_pct) }}%
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ESTUDIANTES CRÍTICOS + ÚLTIMOS PAGOS -->
+<div class="row">
+    <!-- Estudiantes Críticos -->
+    <div class="col-lg-7 mb-4">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-exclamation-triangle-fill"></i> 
+                    Estudiantes Críticos ({{ criticos|length + vencidos|length }})
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                {% if criticos or vencidos %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Estudiante</th>
+                                <th>Curso</th>
+                                <th>Vencimiento</th>
+                                <th>Días</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for e in (vencidos + criticos)[:10] %}
+                            <tr class="{% if e.dias_restantes is none or e.dias_restantes < 0 %}table-danger{% else %}table-warning{% endif %}">
+                                <td>
+                                    <strong>{{ e.nombre_completo }}</strong><br>
+                                    <small class="text-muted">{{ e.email }}</small>
+                                </td>
+                                <td>
+                                    {% if e.curso %}
+                                        <span class="badge bg-info">{{ e.curso.nombre }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ e.fecha_fin.strftime('%d/%m/%Y') if e.fecha_fin else 'N/A' }}</td>
+                                <td>
+                                    {% if e.dias_restantes is not none %}
+                                        {% if e.dias_restantes < 0 %}
+                                            <span class="badge bg-danger">VENCIDO</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">{{ e.dias_restantes }} días</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('pago_nuevo', cliente_id=e.id) }}" 
+                                       class="btn btn-sm btn-success">
+                                        <i class="bi bi-credit-card"></i> Pagar
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-check-circle text-success" style="font-size: 48px;"></i>
+                    <p class="text-muted mt-2">No hay estudiantes críticos</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Últimos Pagos -->
+    <div class="col-lg-5 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history"></i> Últimos Pagos
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                {% if ultimos_pagos %}
+                <div class="list-group list-group-flush">
+                    {% for pago in ultimos_pagos %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ pago.cliente.nombre_completo }}</strong><br>
+                                <small class="text-muted">
+                                    {{ pago.fecha_pago.strftime('%d/%m/%Y %H:%M') }}
+                                </small>
+                            </div>
+                            <span class="badge bg-success" style="font-size: 1rem;">
+                                ${{ "%.2f"|format(pago.monto) }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-inbox" style="font-size: 48px; color: #ccc;"></i>
+                    <p class="text-muted mt-2">No hay pagos registrados</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Accesos Rápidos -->
+<div class="row mt-4 no-print">
+    <div class="col-md-12">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h6 class="mb-3">
+                    <i class="bi bi-lightning-fill"></i> Accesos Rápidos
+                </h6>
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('cliente_nuevo') }}" class="btn btn-outline-primary w-100">
+                            <i class="bi bi-person-plus"></i> Nueva Inscripción
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('clientes') }}" class="btn btn-outline-success w-100">
+                            <i class="bi bi-people"></i> Ver Estudiantes
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('reportes') }}" class="btn btn-outline-info w-100">
+                            <i class="bi bi-file-earmark-excel"></i> Reportes
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <a href="{{ url_for('configuracion') }}" class="btn btn-outline-secondary w-100">
+                            <i class="bi bi-gear"></i> Configuración
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Gráfico de Vencimientos
+const ctx = document.getElementById('chartVencimientos');
+if (ctx) {
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: [
+                'Al Día (>7 días)', 
+                'Próximamente (4-7 días)', 
+                'Críticos (≤3 días)', 
+                'Vencidos',
+                'Sin Cobertura'
+            ],
+            datasets: [{
+                data: [
+                    {{ al_dia|length }},
+                    {{ proximamente|length }},
+                    {{ criticos|length }},
+                    {{ vencidos|length }},
+                    {{ sin_cobertura|length }}
+                ],
+                backgroundColor: [
+                    '#28a745',
+                    '#17a2b8',
+                    '#ffc107',
+                    '#dc3545',
+                    '#6c757d'
+                ],
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        padding: 15,
+                        font: {
+                            size: 13
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = {{ total_estudiantes }};
+                            const value = context.parsed;
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return context.label + ': ' + value + ' (' + percentage + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Auto-refresh cada 5 minutos
+setTimeout(() => location.reload(), 300000);
+</script>
+{% endblock %}

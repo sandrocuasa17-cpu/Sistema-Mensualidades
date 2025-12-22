@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Configuración Centralizada del Sistema
-✅ COMPATIBLE CON RENDER (PostgreSQL + SQLite local)
+Todas las configuraciones deben estar aquí
 """
 
 import os
@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 # Cargar variables de entorno desde .env (en local)
 load_dotenv()
 
-# Directorio base de la aplicación
+# Directorio base de la aplicación (carpeta donde está config.py)
 BASE_DIR = Path(__file__).parent.resolve()
 
 
@@ -35,32 +35,13 @@ class Config:
     LOG_FILE = LOG_DIR / "app.log"
 
     # === BASE DE DATOS ===
-    # ✅ FIX: Manejo correcto de DATABASE_URL de Render
-    _db_url = os.environ.get("DATABASE_URL")
-    
-    if _db_url:
-        # Render usa postgres://, pero SQLAlchemy necesita postgresql://
-        if _db_url.startswith("postgres://"):
-            _db_url = _db_url.replace("postgres://", "postgresql://", 1)
-        SQLALCHEMY_DATABASE_URI = _db_url
-    else:
-        # Desarrollo local: SQLite
-        SQLALCHEMY_DATABASE_URI = f"sqlite:///{(INSTANCE_DIR / 'database.db').as_posix()}"
+    # Producción (Render): si existe DATABASE_URL úsalo (normalmente Postgres).
+    # Si no existe: usa SQLite dentro de instance/database.db
+    _default_sqlite = f"sqlite:///{(INSTANCE_DIR / 'database.db').as_posix()}"
+    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL", _default_sqlite)
 
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_ECHO = False
-
-    # === DETECCIÓN DE ENTORNO ===
-    @staticmethod
-    def is_production():
-        """Detecta si estamos en producción (Render)"""
-        return os.environ.get("DATABASE_URL") is not None
-    
-    @staticmethod
-    def is_sqlite():
-        """Detecta si la base de datos es SQLite"""
-        db_uri = Config.SQLALCHEMY_DATABASE_URI
-        return db_uri.startswith("sqlite://")
+    SQLALCHEMY_ECHO = False  # True para ver SQL en logs (debug)
 
     # === CORREO ELECTRÓNICO ===
     MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
@@ -73,15 +54,13 @@ class Config:
 
     # === CONFIGURACIÓN DE SESIÓN ===
     SESSION_TYPE = "filesystem"
-    PERMANENT_SESSION_LIFETIME = 3600
+    PERMANENT_SESSION_LIFETIME = 3600  # 1 hora
 
     # === CONFIGURACIÓN DE UPLOADS ===
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max
 
     # === BACKUP DE BASE DE DATOS ===
     MAX_BACKUPS = 10
-    # ✅ NUEVO: Deshabilitar backups en producción (solo funciona con SQLite)
-    ENABLE_DATABASE_BACKUPS = not is_production.__func__()
 
     # === PAGINACIÓN ===
     ITEMS_PER_PAGE = 20
@@ -102,7 +81,7 @@ class Config:
 
     @staticmethod
     def init_app(app):
-        """Inicializar configuraciones adicionales"""
+        """Inicializar configuraciones adicionales (carpetas, etc.)"""
         _ensure_dir(Config.INSTANCE_DIR)
         _ensure_dir(Config.UPLOAD_FOLDER)
         _ensure_dir(Config.BACKUP_DIR)
@@ -118,13 +97,12 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     DEBUG = False
     TESTING = False
-    SQLALCHEMY_ECHO = False
 
     @property
     def SECRET_KEY(self):
         secret = os.environ.get("SECRET_KEY")
         if not secret:
-            raise ValueError("❌ SECRET_KEY debe estar configurada en producción!")
+            raise ValueError("SECRET_KEY must be set in production!")
         return secret
 
 
@@ -145,10 +123,5 @@ config = {
 def get_config(env=None):
     """Obtiene la configuración según el entorno"""
     if env is None:
-        # Si existe DATABASE_URL, asumir producción
-        if os.environ.get("DATABASE_URL"):
-            env = "production"
-        else:
-            env = os.environ.get("FLASK_ENV", "development")
-    
+        env = os.environ.get("FLASK_ENV", "development")
     return config.get(env, config["default"])

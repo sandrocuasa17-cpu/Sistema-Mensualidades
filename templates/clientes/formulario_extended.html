@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Editar' if cliente else 'Nueva Inscripción' }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>
+        <i class="bi bi-person-{{ 'gear' if cliente else 'plus-circle' }}"></i> 
+        {{ 'Editar Estudiante' if cliente else 'Nueva Inscripción de Estudiante' }}
+    </h2>
+    <p>{{ 'Actualiza la información del estudiante' if cliente else 'Completa todos los datos de inscripción' }}</p>
+</div>
+
+<div class="row">
+    <div class="col-md-10 mx-auto">
+        <form method="POST" id="formInscripcion">
+            
+            <!-- PASO 1: DATOS PERSONALES -->
+            <div class="card mb-4">
+                <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <h5 class="mb-0">
+                        <span class="badge bg-white text-primary me-2">1</span>
+                        <i class="bi bi-person-vcard"></i> Datos Personales
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="nombre" class="form-label">
+                                <i class="bi bi-person"></i> Nombre *
+                            </label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="nombre" 
+                                   name="nombre" 
+                                   value="{{ cliente.nombre if cliente else '' }}"
+                                   placeholder="Ej: Juan"
+                                   required
+                                   autofocus>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="apellido" class="form-label">
+                                <i class="bi bi-person"></i> Apellido *
+                            </label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="apellido" 
+                                   name="apellido" 
+                                   value="{{ cliente.apellido if cliente else '' }}"
+                                   placeholder="Ej: Pérez"
+                                   required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">
+                                <i class="bi bi-envelope"></i> Email *
+                            </label>
+                            <input type="email" 
+                                   class="form-control" 
+                                   id="email" 
+                                   name="email" 
+                                   value="{{ cliente.email if cliente else '' }}"
+                                   placeholder="estudiante@email.com"
+                                   required>
+                            <small class="text-muted">Para envío de notificaciones automáticas</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="telefono" class="form-label">
+                                <i class="bi bi-phone"></i> Teléfono
+                            </label>
+                            <input type="tel" 
+                                   class="form-control" 
+                                   id="telefono" 
+                                   name="telefono" 
+                                   value="{{ cliente.telefono if cliente else '' }}"
+                                   placeholder="0987654321">
+                        </div>
+                    </div>
+                    
+                    <!-- Cédula -->
+                    <div class="mb-3">
+                        <label for="cedula" class="form-label">
+                            <i class="bi bi-card-text"></i> Cédula/DNI
+                        </label>
+                        <input 
+                            type="text" 
+                            class="form-control" 
+                            id="cedula" 
+                            name="cedula" 
+                            value="{{ cliente.cedula if cliente else '' }}"
+                            placeholder="Ej: 1234567890"
+                            pattern="[0-9]{10,13}"
+                            title="Ingresa entre 10 y 13 dígitos">
+                        <div class="form-text">Número de identificación (10-13 dígitos)</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="direccion" class="form-label">
+                            <i class="bi bi-geo-alt"></i> Dirección
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="direccion" 
+                               name="direccion" 
+                               value="{{ cliente.direccion if cliente else '' }}"
+                               placeholder="Dirección completa">
+                    </div>
+                </div>
+            </div>
+
+            <!-- PASO 2: CURSO (OBLIGATORIO) -->
+            <div class="card mb-4 border-success" style="border-width: 2px;">
+                <div class="card-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+                    <h5 class="mb-0">
+                        <span class="badge bg-white text-success me-2">2</span>
+                        <i class="bi bi-book-fill"></i> Selección de Curso *
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Obligatorio:</strong> Selecciona el curso en el cual se inscribe. 
+                        El valor de inscripción se completará automáticamente.
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="curso_id" class="form-label">
+                            <i class="bi bi-book"></i> Curso a inscribir *
+                        </label>
+                        <select class="form-select form-select-lg" 
+                                id="curso_id" 
+                                name="curso_id" 
+                                required>
+                            <option value="">-- Selecciona un curso --</option>
+                            {% for curso in cursos %}
+                            <option value="{{ curso.id }}" 
+                                    data-inscripcion="{{ curso.precio_inscripcion }}"
+                                    data-mensual="{{ curso.precio_mensual }}"
+                                    {% if cliente and cliente.curso_id == curso.id %}selected{% endif %}>
+                                {{ curso.nombre }} - Inscripción: ${{ "%.2f"|format(curso.precio_inscripcion) }} | Mensual: ${{ "%.2f"|format(curso.precio_mensual) }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Vista previa del curso seleccionado -->
+                    <div id="cursoInfo" class="card bg-light" style="display: none;">
+                        <div class="card-body">
+                            <h6 class="text-primary">
+                                <i class="bi bi-info-circle"></i> Información del Curso
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-1">
+                                        <strong>Inscripción:</strong> 
+                                        <span id="cursoInscripcion" class="text-success">$0.00</span>
+                                    </p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-1">
+                                        <strong>Mensualidad:</strong> 
+                                        <span id="cursoMensual" class="text-info">$0.00</span>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PASO 3: DATOS DE INSCRIPCIÓN -->
+            <div class="card mb-4">
+                <div class="card-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                    <h5 class="mb-0">
+                        <span class="badge bg-white text-danger me-2">3</span>
+                        <i class="bi bi-calendar-check"></i> Datos de Inscripción
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="fecha_registro" class="form-label">
+                                <i class="bi bi-calendar-event"></i> Fecha de Registro
+                            </label>
+                            <input type="date" 
+                                   class="form-control" 
+                                   id="fecha_registro" 
+                                   name="fecha_registro" 
+                                   value="{{ cliente.fecha_registro.strftime('%Y-%m-%d') if cliente and cliente.fecha_registro else '' }}">
+                            <small class="text-muted">Hoy si se deja vacío</small>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="fecha_inicio_clases" class="form-label">
+                                <i class="bi bi-calendar-plus"></i> Inicio de Clases *
+                            </label>
+                            <input type="date" 
+                                   class="form-control" 
+                                   id="fecha_inicio_clases" 
+                                   name="fecha_inicio_clases" 
+                                   value="{{ cliente.fecha_inicio_clases.strftime('%Y-%m-%d') if cliente and cliente.fecha_inicio_clases else '' }}"
+                                   required>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="valor_inscripcion" class="form-label">
+                                <i class="bi bi-cash-coin"></i> Valor Inscripción
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="valor_inscripcion" 
+                                       name="valor_inscripcion" 
+                                       step="0.01" 
+                                       min="0"
+                                       value="{{ cliente.valor_inscripcion if cliente else '' }}"
+                                       placeholder="Se completa automático">
+                            </div>
+                            <small class="text-muted">Auto desde el curso</small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="mensualidades_canceladas" class="form-label">
+                                <i class="bi bi-check2-circle"></i> Mensualidades Ya Canceladas
+                            </label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="mensualidades_canceladas" 
+                                   name="mensualidades_canceladas" 
+                                   min="0"
+                                   value="{{ cliente.mensualidades_canceladas if cliente else '0' }}">
+                            <small class="text-muted">Si ya pagó alguna mensualidad</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="fecha_fin" class="form-label">
+                                <i class="bi bi-calendar-x"></i> Fecha Vencimiento
+                            </label>
+                            <input type="date" 
+                                   class="form-control" 
+                                   id="fecha_fin" 
+                                   name="fecha_fin" 
+                                   value="{{ cliente.fecha_fin.strftime('%Y-%m-%d') if cliente and cliente.fecha_fin else '' }}"
+                                   readonly
+                                   style="background-color: #e9ecef;">
+                            <small class="text-muted">Se calcula automático</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="observaciones_inscripcion" class="form-label">
+                            <i class="bi bi-chat-left-text"></i> Observaciones de Inscripción
+                        </label>
+                        <textarea class="form-control" 
+                                  id="observaciones_inscripcion" 
+                                  name="observaciones_inscripcion" 
+                                  rows="3"
+                                  placeholder="Detalles importantes sobre esta inscripción...">{{ cliente.observaciones_inscripcion if cliente else '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NOTAS ADICIONALES -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-sticky"></i> Notas Adicionales
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="notas" class="form-label">Notas Generales</label>
+                        <textarea class="form-control" 
+                                  id="notas" 
+                                  name="notas" 
+                                  rows="3"
+                                  placeholder="Información adicional...">{{ cliente.notas if cliente else '' }}</textarea>
+                    </div>
+
+                    {% if cliente %}
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" 
+                               type="checkbox" 
+                               id="activo" 
+                               name="activo"
+                               {% if cliente.activo %}checked{% endif %}>
+                        <label class="form-check-label" for="activo">
+                            <strong>Estudiante Activo</strong>
+                        </label>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- BOTONES -->
+            <div class="d-flex justify-content-between mb-4">
+                <a href="{{ url_for('clientes') }}" class="btn btn-secondary btn-lg">
+                    <i class="bi bi-arrow-left"></i> Cancelar
+                </a>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-{{ 'save' if cliente else 'check-circle' }}"></i> 
+                    {{ 'Guardar Cambios' if cliente else 'Inscribir Estudiante' }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cursoSelect = document.getElementById('curso_id');
+    const valorInscripcionInput = document.getElementById('valor_inscripcion');
+    const fechaInicioInput = document.getElementById('fecha_inicio_clases');
+    const mensualidadesInput = document.getElementById('mensualidades_canceladas');
+    const fechaFinInput = document.getElementById('fecha_fin');
+    const cursoInfo = document.getElementById('cursoInfo');
+    const cursoInscripcion = document.getElementById('cursoInscripcion');
+    const cursoMensual = document.getElementById('cursoMensual');
+    
+    // ✅ Función para actualizar info del curso
+    function actualizarInfoCurso() {
+        const selectedOption = cursoSelect.options[cursoSelect.selectedIndex];
+        
+        if (cursoSelect.value && selectedOption) {
+            const precioInscripcion = selectedOption.getAttribute('data-inscripcion');
+            const precioMensual = selectedOption.getAttribute('data-mensual');
+            
+            if (precioInscripcion && precioMensual) {
+                valorInscripcionInput.value = precioInscripcion;
+                cursoInscripcion.textContent = '$' + parseFloat(precioInscripcion).toFixed(2);
+                cursoMensual.textContent = '$' + parseFloat(precioMensual).toFixed(2);
+                cursoInfo.style.display = 'block';
+                
+                calcularFechaVencimiento();
+            }
+        } else {
+            cursoInfo.style.display = 'none';
+            valorInscripcionInput.value = '';
+        }
+    }
+    
+    // ✅ Función mejorada para calcular fecha de vencimiento
+    function calcularFechaVencimiento() {
+        const fechaInicio = fechaInicioInput.value;
+        const mensualidades = parseInt(mensualidadesInput.value) || 0;
+        
+        if (fechaInicio) {
+            // ✅ CRÍTICO: Agregar 'T00:00:00' para evitar problemas de zona horaria
+            const fecha = new Date(fechaInicio + 'T00:00:00');
+            
+            // ✅ Si tiene mensualidades pagadas, calcular vencimiento
+            if (mensualidades > 0) {
+                const diasASumar = mensualidades * 30;
+                fecha.setDate(fecha.getDate() + diasASumar);
+            }
+            // ✅ Si no tiene mensualidades (0), fecha_fin = fecha_inicio (sin cobertura)
+            
+            const year = fecha.getFullYear();
+            const month = String(fecha.getMonth() + 1).padStart(2, '0');
+            const day = String(fecha.getDate()).padStart(2, '0');
+            
+            fechaFinInput.value = `${year}-${month}-${day}`;
+        }
+    }
+    
+    // Event listeners
+    cursoSelect.addEventListener('change', actualizarInfoCurso);
+    fechaInicioInput.addEventListener('change', calcularFechaVencimiento);
+    mensualidadesInput.addEventListener('input', calcularFechaVencimiento);
+    
+    // ✅ Inicializar si hay curso preseleccionado
+    if (cursoSelect.value) {
+        actualizarInfoCurso();
+    }
+});
+</script>
+{% endblock %}

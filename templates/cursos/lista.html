@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}Cursos - Sistema de Mensualidades{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h2><i class="bi bi-book-fill"></i> Gestión de Cursos</h2>
+        <p>Administra los cursos disponibles en la institución</p>
+    </div>
+    <a href="{{ url_for('curso_nuevo') }}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Nuevo Curso
+    </a>
+</div>
+
+<!-- Cursos Grid -->
+<div class="row">
+    {% if cursos %}
+        {% for curso in cursos %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 {% if not curso.activo %}opacity-75{% endif %}">
+                <div class="card-header text-center" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+                    <h4 class="mb-0">{{ curso.nombre }}</h4>
+                    {% if not curso.activo %}
+                    <span class="badge bg-secondary mt-2">Inactivo</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if curso.descripcion %}
+                    <p class="text-muted mb-3">{{ curso.descripcion }}</p>
+                    {% endif %}
+                    
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">
+                                <i class="bi bi-cash"></i> Mensualidad
+                            </span>
+                            <span class="badge bg-success" style="font-size: 14px;">
+                                ${{ "%.2f"|format(curso.precio_mensual) }}
+                            </span>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">
+                                <i class="bi bi-credit-card"></i> Inscripción
+                            </span>
+                            <span class="badge bg-info" style="font-size: 14px;">
+                                ${{ "%.2f"|format(curso.precio_inscripcion) }}
+                            </span>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-muted">
+                                <i class="bi bi-calendar-range"></i> Duración
+                            </span>
+                            <span class="text-muted">
+                                {{ curso.duracion_meses }} meses
+                            </span>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted">
+                                <i class="bi bi-people"></i> Estudiantes
+                            </span>
+                            <span class="badge bg-primary">
+                                {{ curso.estudiantes|selectattr('activo')|list|length }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-top">
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('curso_editar', id=curso.id) }}" 
+                           class="btn btn-sm btn-outline-warning">
+                            <i class="bi bi-pencil"></i> Editar
+                        </a>
+                        
+                        {% if curso.estudiantes|length == 0 %}
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-danger"
+                                onclick="confirmarEliminarCurso({{ curso.id }}, '{{ curso.nombre }}')">
+                            <i class="bi bi-trash"></i> Eliminar
+                        </button>
+                        {% else %}
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-secondary"
+                                disabled
+                                title="No se puede eliminar un curso con estudiantes">
+                            <i class="bi bi-lock"></i> En Uso
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-book" style="font-size: 64px; color: #ccc;"></i>
+                    <h4 class="mt-3 text-muted">No hay cursos registrados</h4>
+                    <p class="text-muted">Crea tu primer curso</p>
+                    <a href="{{ url_for('curso_nuevo') }}" class="btn btn-primary mt-3">
+                        <i class="bi bi-plus-circle"></i> Crear Primer Curso
+                    </a>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function confirmarEliminarCurso(cursoId, cursoNombre) {
+        if (confirm(`¿Estás seguro de eliminar el curso "${cursoNombre}"?\n\nEsta acción no se puede deshacer.`)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/cursos/${cursoId}/eliminar`;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+</script>
+{% endblock %}

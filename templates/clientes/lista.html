@@ -5,36 +5,88 @@
 {% block content %}
 <div class="page-header d-flex justify-content-between align-items-center">
     <div>
-        <h2><i class="bi bi-people"></i> Gestión de Clientes</h2>
-        <p>Administra tus clientes y sus pagos</p>
+        <h2><i class="bi bi-people"></i> Gestión de Estudiantes</h2>
+        <p>Administra tus estudiantes y sus pagos</p>
     </div>
-    <a href="{{ url_for('cliente_nuevo') }}" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Nuevo Cliente
+    <a href="{{ url_for('cliente_nuevo') }}" class="btn btn-primary btn-lg">
+        <i class="bi bi-plus-circle"></i> Nueva Inscripción
     </a>
 </div>
 
-<!-- Search Bar -->
+<!-- Barra de búsqueda y filtros -->
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" action="{{ url_for('clientes') }}">
-            <div class="input-group">
-                <span class="input-group-text"><i class="bi bi-search"></i></span>
-                <input type="text" class="form-control" name="busqueda" 
-                       placeholder="Buscar por nombre, apellido o email..." 
-                       value="{{ request.args.get('busqueda', '') }}">
-                <button class="btn btn-primary" type="submit">Buscar</button>
-                {% if request.args.get('busqueda') %}
-                <a href="{{ url_for('clientes') }}" class="btn btn-secondary">Limpiar</a>
-                {% endif %}
+            <div class="row align-items-end">
+                <div class="col-md-8 mb-2">
+                    <label for="busqueda" class="form-label">Buscar estudiante</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" 
+                               class="form-control" 
+                               id="busqueda"
+                               name="busqueda" 
+                               placeholder="Buscar por nombre, apellido, email o cédula..." 
+                               value="{{ request.args.get('busqueda', '') }}">
+                    </div>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <button class="btn btn-primary w-100" type="submit">
+                        <i class="bi bi-search"></i> Buscar
+                    </button>
+                    {% if request.args.get('busqueda') %}
+                    <a href="{{ url_for('clientes') }}" class="btn btn-secondary w-100 mt-2">
+                        <i class="bi bi-x-circle"></i> Limpiar
+                    </a>
+                    {% endif %}
+                </div>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Clients Table -->
+<!-- Estadísticas rápidas -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-2">
+        <div class="card text-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+            <div class="card-body py-3">
+                <h2 class="mb-0">{{ clientes|length }}</h2>
+                <small>Total Estudiantes</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-2">
+        <div class="card text-center" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+            <div class="card-body py-3">
+                <h2 class="mb-0">{{ clientes|selectattr('activo')|list|length }}</h2>
+                <small>Activos</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-2">
+        <div class="card text-center" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+            <div class="card-body py-3">
+                <h2 class="mb-0">{{ clientes|selectattr('proximo_a_vencer')|list|length }}</h2>
+                <small>Próximos a Vencer</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-2">
+        <div class="card text-center" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white;">
+            <div class="card-body py-3">
+                <h2 class="mb-0">{{ clientes|selectattr('plan_vencido')|list|length }}</h2>
+                <small>Vencidos</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de clientes -->
 <div class="card">
     <div class="card-header">
-        <h5 class="card-title"><i class="bi bi-list"></i> Lista de Clientes ({{ clientes|length }})</h5>
+        <h5 class="card-title mb-0">
+            <i class="bi bi-list"></i> Lista de Estudiantes ({{ clientes|length }})
+        </h5>
     </div>
     <div class="card-body">
         {% if clientes %}
@@ -42,17 +94,19 @@
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th>Cliente</th>
-                        <th>Plan</th>
-                        <th>Estado</th>
-                        <th>Saldo Pendiente</th>
+                        <th>Estudiante</th>
+                        <th>Cédula</th>
+                        <th>Curso</th>
                         <th>Fecha Inicio</th>
+                        <th>Vencimiento</th>
+                        <th>Estado</th>
+                        <th>Mensualidades</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for cliente in clientes %}
-                    <tr>
+                    <tr class="{% if cliente.plan_vencido %}table-danger{% elif cliente.proximo_a_vencer %}table-warning{% endif %}">
                         <td>
                             <strong>{{ cliente.nombre_completo }}</strong><br>
                             <small class="text-muted">
@@ -64,41 +118,94 @@
                             </small>
                             {% endif %}
                         </td>
+                        
+                        <!-- ✅ COLUMNA: CÉDULA -->
                         <td>
-                            {% if cliente.plan %}
-                                <span class="badge bg-info">{{ cliente.plan.nombre }}</span><br>
-                                <small class="text-muted">${{ "%.2f"|format(cliente.plan.precio) }}/mes</small>
-                            {% else %}
-                                <span class="badge bg-secondary">Sin plan</span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if cliente.estado_pago == 'moroso' %}
-                                <span class="badge badge-moroso">
-                                    <i class="bi bi-exclamation-triangle"></i> Moroso
-                                </span>
-                            {% elif cliente.estado_pago == 'por-vencer' %}
-                                <span class="badge badge-por-vencer">
-                                    <i class="bi bi-clock"></i> Por Vencer
-                                </span>
-                            {% elif cliente.estado_pago == 'al-dia' %}
-                                <span class="badge badge-al-dia">
-                                    <i class="bi bi-check-circle"></i> Al Día
+                            {% if cliente.cedula %}
+                                <span class="badge bg-secondary" style="font-size: 12px; font-family: monospace;">
+                                    <i class="bi bi-card-text"></i> {{ cliente.cedula }}
                                 </span>
                             {% else %}
-                                <span class="badge bg-secondary">Sin Pagos</span>
+                                <small class="text-muted">Sin registrar</small>
                             {% endif %}
                         </td>
+                        
                         <td>
-                            {% if cliente.saldo_pendiente > 0 %}
-                                <span class="text-danger fw-bold">
-                                    ${{ "%.2f"|format(cliente.saldo_pendiente) }}
+                            {% if cliente.curso %}
+                                <span class="badge bg-info" style="font-size: 13px;">
+                                    <i class="bi bi-book"></i> {{ cliente.curso.nombre }}
+                                </span>
+                                <br>
+                                <small class="text-muted">
+                                    ${{ "%.2f"|format(cliente.curso.precio_mensual) }}/mes
+                                </small>
+                            {% else %}
+                                <span class="badge bg-secondary">Sin curso</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td>
+                            {% if cliente.fecha_inicio_clases %}
+                                <strong>{{ cliente.fecha_inicio_clases.strftime('%d/%m/%Y') }}</strong>
+                            {% else %}
+                                <span class="text-muted">N/A</span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- ✅ COLUMNA: VENCIMIENTO (CORREGIDA) -->
+                        <td>
+                            {% if cliente.fecha_fin %}
+                                <strong>{{ cliente.fecha_fin.strftime('%d/%m/%Y') }}</strong>
+                                
+                                {% if cliente.dias_restantes is not none %}
+                                <br>
+                                    {% if cliente.estado_pago == 'pendiente-inicio' %}
+                                        <span class="badge bg-info text-dark" style="font-size: 11px;">
+                                            <i class="bi bi-calendar-plus"></i> Inicia en {{ cliente.dias_para_inicio }} día{{ 's' if cliente.dias_para_inicio != 1 else '' }}
+                                        </span>
+                                    {% elif cliente.dias_restantes <= 0 %}
+                                        <span class="badge bg-danger" style="font-size: 11px;">
+                                            <i class="bi bi-x-circle"></i> VENCIDO
+                                        </span>
+                                    {% elif cliente.dias_restantes <= 3 %}
+                                        <span class="badge bg-danger" style="font-size: 11px;">
+                                            <i class="bi bi-exclamation-triangle"></i> {{ cliente.dias_restantes }} días
+                                        </span>
+                                    {% elif cliente.dias_restantes <= 7 %}
+                                        <span class="badge bg-warning text-dark" style="font-size: 11px;">
+                                            <i class="bi bi-clock"></i> {{ cliente.dias_restantes }} días
+                                        </span>
+                                    {% else %}
+                                        <small class="text-success">
+                                            <i class="bi bi-check-circle"></i> {{ cliente.dias_restantes }} días
+                                        </small>
+                                    {% endif %}
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted">No definida</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td>
+                            {% if cliente.activo %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> Activo
                                 </span>
                             {% else %}
-                                <span class="text-success fw-bold">$0.00</span>
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-pause-circle"></i> Inactivo
+                                </span>
                             {% endif %}
                         </td>
-                        <td>{{ cliente.fecha_inicio.strftime('%d/%m/%Y') }}</td>
+                        
+                        <td class="text-center">
+                            <span class="badge bg-primary" style="font-size: 14px;">
+                                {{ cliente.mensualidades_canceladas }}
+                            </span>
+                            <br>
+                            <small class="text-muted">pagadas</small>
+                        </td>
+                        
                         <td>
                             <div class="btn-group" role="group">
                                 <a href="{{ url_for('cliente_detalle', id=cliente.id) }}" 
@@ -107,7 +214,7 @@
                                     <i class="bi bi-eye"></i>
                                 </a>
                                 <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" 
-                                   class="btn btn-sm btn-outline-success" 
+                                   class="btn btn-sm btn-success" 
                                    title="Registrar Pago">
                                     <i class="bi bi-credit-card"></i>
                                 </a>
@@ -129,14 +236,39 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Leyenda de colores -->
+        <div class="alert alert-info mt-3 mb-0">
+            <small>
+                <strong><i class="bi bi-info-circle"></i> Leyenda:</strong>
+                <span class="badge bg-danger ms-2">Rojo</span> = Vencido o ≤3 días |
+                <span class="badge bg-warning text-dark ms-2">Amarillo</span> = 4-7 días |
+                <span class="badge bg-light text-dark border ms-2">Blanco</span> = >7 días
+            </small>
+        </div>
+        
         {% else %}
         <div class="text-center py-5">
             <i class="bi bi-inbox" style="font-size: 64px; color: #ccc;"></i>
-            <h4 class="mt-3 text-muted">No hay clientes registrados</h4>
-            <p class="text-muted">Comienza agregando tu primer cliente</p>
+            <h4 class="mt-3 text-muted">
+                {% if request.args.get('busqueda') %}
+                    No se encontraron estudiantes con "{{ request.args.get('busqueda') }}"
+                {% else %}
+                    No hay estudiantes registrados
+                {% endif %}
+            </h4>
+            <p class="text-muted">
+                {% if request.args.get('busqueda') %}
+                    Intenta con otro término de búsqueda
+                {% else %}
+                    Comienza inscribiendo tu primer estudiante
+                {% endif %}
+            </p>
+            {% if not request.args.get('busqueda') %}
             <a href="{{ url_for('cliente_nuevo') }}" class="btn btn-primary mt-3">
-                <i class="bi bi-plus-circle"></i> Agregar Cliente
+                <i class="bi bi-plus-circle"></i> Inscribir Primer Estudiante
             </a>
+            {% endif %}
         </div>
         {% endif %}
     </div>
@@ -146,7 +278,7 @@
 {% block extra_js %}
 <script>
     function confirmarEliminar(clienteId, clienteNombre) {
-        if (confirm(`¿Estás seguro de eliminar al cliente "${clienteNombre}"?\n\nEsta acción no se puede deshacer y eliminará también todo el historial de pagos.`)) {
+        if (confirm(`¿Estás seguro de eliminar al estudiante "${clienteNombre}"?\n\n⚠️ Esta acción eliminará:\n• Todos los datos personales\n• Historial de pagos\n• Información de inscripción\n\nEsta acción NO se puede deshacer.`)) {
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = `/clientes/${clienteId}/eliminar`;

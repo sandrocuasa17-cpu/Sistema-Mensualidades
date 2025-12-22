@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Editar' if curso else 'Nuevo' }} Curso{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>
+        <i class="bi bi-book-{{ 'fill' if curso else '' }}"></i> 
+        {{ 'Editar Curso' if curso else 'Nuevo Curso' }}
+    </h2>
+    <p>{{ 'Actualiza la información del curso' if curso else 'Define un nuevo curso' }}</p>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+                <h5 class="mb-0">
+                    <i class="bi bi-file-text"></i> Información del Curso
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <!-- Nombre del Curso -->
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre del Curso *</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="nombre" 
+                               name="nombre" 
+                               value="{{ curso.nombre if curso else '' }}"
+                               placeholder="Ej: Inglés Básico, Computación Avanzada"
+                               required
+                               autofocus>
+                        <small class="text-muted">Nombre descriptivo del curso</small>
+                    </div>
+
+                    <!-- Descripción -->
+                    <div class="mb-3">
+                        <label for="descripcion" class="form-label">Descripción</label>
+                        <textarea class="form-control" 
+                                  id="descripcion" 
+                                  name="descripcion" 
+                                  rows="3"
+                                  placeholder="Describe el contenido y objetivos del curso...">{{ curso.descripcion if curso else '' }}</textarea>
+                        <small class="text-muted">Opcional: detalles sobre el curso</small>
+                    </div>
+
+                    <div class="row">
+                        <!-- Precio Mensual -->
+                        <div class="col-md-4 mb-3">
+                            <label for="precio_mensual" class="form-label">
+                                <i class="bi bi-cash"></i> Precio Mensual *
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="precio_mensual" 
+                                       name="precio_mensual" 
+                                       step="0.01" 
+                                       min="0.01"
+                                       value="{{ curso.precio_mensual if curso else '' }}"
+                                       required>
+                            </div>
+                            <small class="text-muted">Costo por mes</small>
+                        </div>
+
+                        <!-- Precio de Inscripción -->
+                        <div class="col-md-4 mb-3">
+                            <label for="precio_inscripcion" class="form-label">
+                                <i class="bi bi-credit-card"></i> Inscripción
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" 
+                                       class="form-control" 
+                                       id="precio_inscripcion" 
+                                       name="precio_inscripcion" 
+                                       step="0.01" 
+                                       min="0"
+                                       value="{{ curso.precio_inscripcion if curso else '0' }}">
+                            </div>
+                            <small class="text-muted">Pago único inicial</small>
+                        </div>
+
+                        <!-- Duración -->
+                        <div class="col-md-4 mb-3">
+                            <label for="duracion_meses" class="form-label">
+                                <i class="bi bi-calendar-range"></i> Duración (meses) *
+                            </label>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="duracion_meses" 
+                                   name="duracion_meses" 
+                                   min="1"
+                                   value="{{ curso.duracion_meses if curso else '12' }}"
+                                   required>
+                            <small class="text-muted">Duración total</small>
+                        </div>
+                    </div>
+
+                    <!-- Estado (solo al editar) -->
+                    {% if curso %}
+                    <div class="mb-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" 
+                                   type="checkbox" 
+                                   id="activo" 
+                                   name="activo"
+                                   {% if curso.activo %}checked{% endif %}>
+                            <label class="form-check-label" for="activo">
+                                <strong>Curso Activo</strong>
+                            </label>
+                        </div>
+                        <small class="text-muted">
+                            Los cursos inactivos no se pueden asignar a nuevos estudiantes
+                        </small>
+                    </div>
+
+                    <!-- Info de estudiantes actuales -->
+                    {% if curso.estudiantes %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>{{ curso.estudiantes|length }}</strong> estudiante{{ 's' if curso.estudiantes|length != 1 else '' }} 
+                        inscrito{{ 's' if curso.estudiantes|length != 1 else '' }} en este curso
+                    </div>
+                    {% endif %}
+                    {% endif %}
+
+                    <!-- Preview Card -->
+                    <div class="card bg-light mb-4">
+                        <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+                            <h6 class="mb-0">Vista Previa</h6>
+                        </div>
+                        <div class="card-body text-center">
+                            <h4 id="preview-nombre" class="text-primary mb-3">
+                                {{ curso.nombre if curso else 'Nombre del Curso' }}
+                            </h4>
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <p class="text-muted small mb-1">Mensualidad</p>
+                                    <h3 class="text-success mb-0">
+                                        $<span id="preview-mensual">{{ "%.2f"|format(curso.precio_mensual) if curso else '0.00' }}</span>
+                                    </h3>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <p class="text-muted small mb-1">Inscripción</p>
+                                    <h3 class="text-info mb-0">
+                                        $<span id="preview-inscripcion">{{ "%.2f"|format(curso.precio_inscripcion) if curso else '0.00' }}</span>
+                                    </h3>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <p class="text-muted small mb-1">Duración</p>
+                                    <h3 class="text-primary mb-0">
+                                        <span id="preview-duracion">{{ curso.duracion_meses if curso else '12' }}</span> meses
+                                    </h3>
+                                </div>
+                            </div>
+                            
+                            <p id="preview-descripcion" class="text-muted mt-3 small">
+                                {{ curso.descripcion if curso and curso.descripcion else 'Sin descripción' }}
+                            </p>
+                            
+                            <div class="alert alert-success mt-3 mb-0">
+                                <strong>Costo Total del Curso:</strong> 
+                                $<span id="preview-total">
+                                    {% if curso %}
+                                        {{ "%.2f"|format((curso.precio_mensual * curso.duracion_meses) + curso.precio_inscripcion) }}
+                                    {% else %}
+                                        0.00
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botones -->
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{{ url_for('cursos') }}" class="btn btn-secondary btn-lg">
+                            <i class="bi bi-arrow-left"></i> Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-{{ 'save' if curso else 'plus-circle' }}"></i> 
+                            {{ 'Guardar Cambios' if curso else 'Crear Curso' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const nombreInput = document.getElementById('nombre');
+        const precioMensualInput = document.getElementById('precio_mensual');
+        const precioInscripcionInput = document.getElementById('precio_inscripcion');
+        const duracionInput = document.getElementById('duracion_meses');
+        const descripcionInput = document.getElementById('descripcion');
+
+        const previewNombre = document.getElementById('preview-nombre');
+        const previewMensual = document.getElementById('preview-mensual');
+        const previewInscripcion = document.getElementById('preview-inscripcion');
+        const previewDuracion = document.getElementById('preview-duracion');
+        const previewDescripcion = document.getElementById('preview-descripcion');
+        const previewTotal = document.getElementById('preview-total');
+
+        // Live preview
+        nombreInput.addEventListener('input', function() {
+            previewNombre.textContent = this.value || 'Nombre del Curso';
+        });
+
+        precioMensualInput.addEventListener('input', actualizarPreview);
+        precioInscripcionInput.addEventListener('input', actualizarPreview);
+        duracionInput.addEventListener('input', actualizarPreview);
+
+        descripcionInput.addEventListener('input', function() {
+            previewDescripcion.textContent = this.value || 'Sin descripción';
+        });
+
+        function actualizarPreview() {
+            const mensual = parseFloat(precioMensualInput.value) || 0;
+            const inscripcion = parseFloat(precioInscripcionInput.value) || 0;
+            const duracion = parseInt(duracionInput.value) || 0;
+
+            previewMensual.textContent = mensual.toFixed(2);
+            previewInscripcion.textContent = inscripcion.toFixed(2);
+            previewDuracion.textContent = duracion;
+
+            const total = (mensual * duracion) + inscripcion;
+            previewTotal.textContent = total.toFixed(2);
+        }
+    });
+</script>
+{% endblock %}

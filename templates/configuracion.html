@@ -415,6 +415,70 @@
                         </ol>
                     </div>
                     
+                    <!-- Reemplaza la sección de PERSONALIZACIÓN en configuracion.html -->
+
+<!-- ✅ PERSONALIZACIÓN DE CORREOS (CORREGIDO) -->
+<div class="alert alert-primary mb-4">
+    <h6 class="alert-heading">
+        <i class="bi bi-palette-fill"></i> 
+        <strong>Personalización de Correos</strong>
+    </h6>
+    <p class="mb-3">Configura cómo aparecerá tu empresa en los correos enviados a los estudiantes</p>
+    
+    <div class="row">
+        <!-- ✅ NOMBRE DE EMPRESA -->
+        <div class="col-md-6 mb-3">
+            <label for="nombre_empresa" class="form-label">
+                <i class="bi bi-building"></i> <strong>Nombre de la Empresa/Institución *</strong>
+            </label>
+            <input type="text" 
+                   class="form-control form-control-lg" 
+                   id="nombre_empresa" 
+                   name="nombre_empresa"
+                   value="{{ config_correo.nombre_empresa }}"
+                   placeholder="Ej: Preuniversitario XYZ, Academia ABC"
+                   maxlength="100"
+                   required>
+            <small class="text-muted">Este nombre aparecerá en todos los correos enviados</small>
+        </div>
+
+        <!-- ✅ ESLOGAN (OPCIONAL) -->
+        <div class="col-md-6 mb-3">
+            <label for="eslogan_empresa" class="form-label">
+                <i class="bi bi-star"></i> <strong>Eslogan/Subtítulo</strong> (Opcional)
+            </label>
+            <input type="text" 
+                   class="form-control" 
+                   id="eslogan_empresa" 
+                   name="eslogan_empresa"
+                   value="{{ config_correo.eslogan_empresa }}"
+                   placeholder="Ej: Excelencia Académica, Tu Futuro Comienza Aquí"
+                   maxlength="150">
+            <small class="text-muted">Opcional: Aparecerá debajo del nombre en los correos</small>
+        </div>
+    </div>
+
+    <!-- ✅ VISTA PREVIA -->
+    <div class="mt-3 p-4" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px; text-align: center; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+        <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px;">
+            <h4 class="mb-2" id="preview-nombre" style="font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                {{ config_correo.nombre_empresa if config_correo.nombre_empresa else 'Sistema de Gestión de Mensualidades' }}
+            </h4>
+            <p class="mb-0" id="preview-eslogan" style="opacity: 0.95; font-size: 15px;">
+                {{ config_correo.eslogan_empresa if config_correo.eslogan_empresa else 'Ingresa un eslogan para verlo aquí' }}
+            </p>
+        </div>
+        <small class="d-block mt-3" style="opacity: 0.8;">
+            <i class="bi bi-eye"></i> Vista previa de cómo aparecerá en los correos
+        </small>
+    </div>
+</div>
+
+
+                    
+                    <!-- Configuración SMTP -->
+                    <h6 class="mb-3"><i class="bi bi-gear"></i> Configuración del Servidor SMTP</h6>
+                    
                     <div class="row">
                         <div class="col-md-8 mb-3">
                             <label for="mail_server" class="form-label">Servidor SMTP *</label>
@@ -505,6 +569,7 @@
             <div class="card-header">
                 <h5 class="card-title"><i class="bi bi-bell-fill"></i> Sistema de Recordatorios</h5>
             </div>
+
             <div class="card-body">
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i> 
@@ -534,6 +599,118 @@
     </div>
 </div>
 
+<!-- Botón Cambiar Contraseña -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <a href="{{ url_for('cambiar_password_route') }}" class="btn btn-warning btn-lg w-100">
+            <i class="bi bi-key"></i> Cambiar Contraseña
+        </a>
+    </div>
+</div>
+
+<!-- Sistema de Testing (SOLO DESARROLLO) -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-bug-fill"></i> 🧪 Herramientas de Testing
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-danger">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-exclamation-triangle-fill"></i> 
+                        <strong>⚠️ SOLO PARA PRUEBAS:</strong>
+                    </h6>
+                    <p class="mb-0">
+                        Estas herramientas modifican datos reales. Úsalas con cuidado y solo en ambiente de desarrollo.
+                    </p>
+                </div>
+                
+                <!-- Seleccionar estudiante para testing -->
+                <div class="mb-4">
+                    <label class="form-label">
+                        <strong><i class="bi bi-person"></i> Seleccionar Estudiante:</strong>
+                    </label>
+                    <select class="form-select" id="estudiante-testing">
+                        <option value="">-- Selecciona un estudiante --</option>
+                    </select>
+                </div>
+                
+                <!-- Botones de Testing -->
+                <div class="row">
+                    <!-- Test: Registrar Pago -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100 border-primary">
+                            <div class="card-body text-center">
+                                <i class="bi bi-cash-coin" style="font-size: 48px; color: #0d6efd;"></i>
+                                <h6 class="mt-3 mb-3">Test: Registro de Pago</h6>
+                                <p class="text-muted small">
+                                    Simula un pago de 1 mensualidad y envía correo de confirmación
+                                </p>
+                                <button class="btn btn-primary w-100" onclick="testPago()">
+                                    <i class="bi bi-play-fill"></i> Probar Pago
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Test: Próximo a Vencer -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100 border-warning">
+                            <div class="card-body text-center">
+                                <i class="bi bi-exclamation-triangle" style="font-size: 48px; color: #ffc107;"></i>
+                                <h6 class="mt-3 mb-3">Test: Próximo a Vencer</h6>
+                                <p class="text-muted small">
+                                    Ajusta fecha_fin a 3 días y envía recordatorio
+                                </p>
+                                <button class="btn btn-warning w-100" onclick="testProximoVencer()">
+                                    <i class="bi bi-play-fill"></i> Probar Aviso
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Test: Vencido -->
+                    <div class="col-md-4 mb-3">
+                        <div class="card h-100 border-danger">
+                            <div class="card-body text-center">
+                                <i class="bi bi-x-circle" style="font-size: 48px; color: #dc3545;"></i>
+                                <h6 class="mt-3 mb-3">Test: Vencido</h6>
+                                <p class="text-muted small">
+                                    Ajusta fecha_fin a -10 días y envía recordatorio
+                                </p>
+                                <button class="btn btn-danger w-100" onclick="testVencido()">
+                                    <i class="bi bi-play-fill"></i> Probar Vencido
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Botón de Restaurar Estado -->
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <button class="btn btn-secondary btn-lg w-100" onclick="restaurarEstado()">
+                            <i class="bi bi-arrow-counterclockwise"></i> 
+                            Restaurar Estado Original del Estudiante
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Log de acciones -->
+                <div class="mt-4">
+                    <h6><strong>📋 Log de Pruebas:</strong></h6>
+                    <div id="testing-log" class="p-3 bg-light border rounded" style="max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 13px;">
+                        <p class="text-muted mb-0">Selecciona un estudiante y ejecuta una prueba...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -552,14 +729,13 @@
     {% if info_licencia.es_demo and info_licencia.info.minutos_restantes %}
     setTimeout(function() {
         location.reload();
-    }, 60000); // Recargar cada minuto
+    }, 60000);
     {% endif %}
     
     // ====================================
     // SISTEMA DE BACKUP
     // ====================================
     
-    // Cargar información de la base de datos
     function cargarInfoBD() {
         fetch('{{ url_for("backup_info") }}')
             .then(response => response.json())
@@ -583,7 +759,6 @@
             });
     }
     
-    // Confirmar restauración
     function confirmarRestauracion(event) {
         const archivo = document.getElementById('archivo_bd').files[0];
         
@@ -608,7 +783,6 @@
         );
         
         if (confirmacion) {
-            // Mostrar mensaje de espera
             const btnSubmit = document.getElementById('btn-restaurar');
             btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Restaurando...';
             btnSubmit.disabled = true;
@@ -617,9 +791,184 @@
         return confirmacion;
     }
     
-    // Cargar info BD al cargar la página
+    // ====================================
+    // SISTEMA DE TESTING
+    // ====================================
+    
+    async function cargarEstudiantes() {
+        try {
+            const response = await fetch('/api/estudiantes-activos');
+            const data = await response.json();
+            
+            const select = document.getElementById('estudiante-testing');
+            select.innerHTML = '<option value="">-- Selecciona un estudiante --</option>';
+            
+            data.estudiantes.forEach(est => {
+                const option = document.createElement('option');
+                option.value = est.id;
+                option.textContent = `${est.nombre_completo} - ${est.email}`;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            log('❌ Error cargando estudiantes: ' + error, 'danger');
+        }
+    }
+    
+    function log(mensaje, tipo = 'info') {
+        const logDiv = document.getElementById('testing-log');
+        const timestamp = new Date().toLocaleTimeString();
+        const badge = tipo === 'success' ? 'success' : tipo === 'danger' ? 'danger' : 'info';
+        
+        const entry = document.createElement('p');
+        entry.className = `mb-1 text-${badge}`;
+        entry.innerHTML = `<strong>[${timestamp}]</strong> ${mensaje}`;
+        
+        logDiv.insertBefore(entry, logDiv.firstChild);
+    }
+    
+    function getEstudianteSeleccionado() {
+        const select = document.getElementById('estudiante-testing');
+        const estudianteId = select.value;
+        
+        if (!estudianteId) {
+            alert('⚠️ Por favor selecciona un estudiante primero');
+            return null;
+        }
+        
+        return estudianteId;
+    }
+    
+    async function testPago() {
+        const estudianteId = getEstudianteSeleccionado();
+        if (!estudianteId) return;
+        
+        if (!confirm('¿Simular un pago de 1 mensualidad para este estudiante?')) return;
+        
+        try {
+            log(`🔄 Simulando pago para estudiante ${estudianteId}...`, 'info');
+            
+            const response = await fetch(`/test-pago-estudiante/${estudianteId}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                log(`✅ ${data.mensaje}`, 'success');
+                if (data.correo_enviado) {
+                    log(`📧 Correo enviado a: ${data.email}`, 'success');
+                }
+            } else {
+                log(`❌ Error: ${data.error}`, 'danger');
+            }
+        } catch (error) {
+            log(`❌ Error en test: ${error}`, 'danger');
+        }
+    }
+    
+    async function testProximoVencer() {
+        const estudianteId = getEstudianteSeleccionado();
+        if (!estudianteId) return;
+        
+        if (!confirm('¿Ajustar fecha de vencimiento a 3 días y enviar recordatorio?')) return;
+        
+        try {
+            log(`🔄 Configurando estudiante próximo a vencer...`, 'info');
+            
+            const response = await fetch(`/test-proximo-vencer/${estudianteId}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                log(`✅ ${data.mensaje}`, 'success');
+                log(`📅 Nueva fecha de vencimiento: ${data.fecha_fin}`, 'info');
+                if (data.correo_enviado) {
+                    log(`📧 Recordatorio enviado a: ${data.email}`, 'success');
+                }
+            } else {
+                log(`❌ Error: ${data.error}`, 'danger');
+            }
+        } catch (error) {
+            log(`❌ Error en test: ${error}`, 'danger');
+        }
+    }
+    
+    async function testVencido() {
+        const estudianteId = getEstudianteSeleccionado();
+        if (!estudianteId) return;
+        
+        if (!confirm('¿Ajustar fecha de vencimiento a -10 días (vencido) y enviar recordatorio?')) return;
+        
+        try {
+            log(`🔄 Configurando estudiante vencido...`, 'info');
+            
+            const response = await fetch(`/test-vencido/${estudianteId}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                log(`✅ ${data.mensaje}`, 'success');
+                log(`📅 Nueva fecha de vencimiento: ${data.fecha_fin}`, 'info');
+                if (data.correo_enviado) {
+                    log(`📧 Recordatorio enviado a: ${data.email}`, 'success');
+                }
+            } else {
+                log(`❌ Error: ${data.error}`, 'danger');
+            }
+        } catch (error) {
+            log(`❌ Error en test: ${error}`, 'danger');
+        }
+    }
+    
+    async function restaurarEstado() {
+        const estudianteId = getEstudianteSeleccionado();
+        if (!estudianteId) return;
+        
+        if (!confirm('¿Restaurar el estado original del estudiante?')) return;
+        
+        try {
+            log(`🔄 Restaurando estado original...`, 'info');
+            
+            const response = await fetch(`/test-restaurar/${estudianteId}`);
+            const data = await response.json();
+            
+            if (data.success) {
+                log(`✅ ${data.mensaje}`, 'success');
+            } else {
+                log(`❌ Error: ${data.error}`, 'danger');
+            }
+        } catch (error) {
+            log(`❌ Error restaurando: ${error}`, 'danger');
+        }
+    }
+    
+    // Cargar al iniciar la página
     document.addEventListener('DOMContentLoaded', function() {
         cargarInfoBD();
+        if (document.getElementById('estudiante-testing')) {
+            cargarEstudiantes();
+        }
     });
+
+
+   
+document.addEventListener('DOMContentLoaded', function() {
+    const inputNombre = document.getElementById('nombre_empresa');
+    const inputEslogan = document.getElementById('eslogan_empresa');
+    const previewNombre = document.getElementById('preview-nombre');
+    const previewEslogan = document.getElementById('preview-eslogan');
+    
+    // Actualizar nombre en tiempo real
+    if (inputNombre && previewNombre) {
+        inputNombre.addEventListener('input', function() {
+            const valor = this.value.trim();
+            previewNombre.textContent = valor || 'Sistema de Gestión de Mensualidades';
+        });
+    }
+    
+    // Actualizar eslogan en tiempo real
+    if (inputEslogan && previewEslogan) {
+        inputEslogan.addEventListener('input', function() {
+            const valor = this.value.trim();
+            previewEslogan.textContent = valor || 'Ingresa un eslogan para verlo aquí';
+            previewEslogan.style.opacity = valor ? '0.95' : '0.7';
+        });
+    }
+});
 </script>
 {% endblock %}

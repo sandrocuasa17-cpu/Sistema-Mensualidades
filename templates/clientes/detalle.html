@@ -1,235 +1,457 @@
 {% extends "base.html" %}
 
-{% block title %}{{ cliente.nombre_completo }} - Sistema de Mensualidades{% endblock %}
+{% block title %}{{ cliente.nombre_completo }} - Detalle{% endblock %}
 
 {% block content %}
-<div class="page-header d-flex justify-content-between align-items-center">
-    <div>
-        <h2><i class="bi bi-person"></i> {{ cliente.nombre_completo }}</h2>
-        <p>Información detallada del cliente</p>
-    </div>
-    <div>
-        <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" class="btn btn-success">
-            <i class="bi bi-credit-card"></i> Registrar Pago
-        </a>
-        <a href="{{ url_for('cliente_editar', id=cliente.id) }}" class="btn btn-warning">
-            <i class="bi bi-pencil"></i> Editar
-        </a>
-        <a href="{{ url_for('clientes') }}" class="btn btn-secondary">
-            <i class="bi bi-arrow-left"></i> Volver
-        </a>
+<!-- Encabezado con Acciones -->
+<div class="page-header">
+    <div class="d-flex justify-content-between align-items-start flex-wrap">
+        <div class="mb-3">
+            <h2>
+                <i class="bi bi-person-circle"></i> {{ cliente.nombre_completo }}
+                {% if not cliente.activo %}
+                    <span class="badge bg-secondary">Inactivo</span>
+                {% endif %}
+            </h2>
+            <p class="text-muted mb-0">Información completa del estudiante</p>
+        </div>
+        <div class="btn-group mb-3" role="group">
+    <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" 
+       class="btn btn-success">
+        <i class="bi bi-credit-card"></i> Registrar Pago
+    </a>
+    <a href="{{ url_for('pagos_estudiante_pdf', cliente_id=cliente.id) }}" 
+       class="btn btn-danger"
+       target="_blank">
+        <i class="bi bi-file-pdf"></i> Descargar PDF
+    </a>
+    <a href="{{ url_for('cliente_editar', id=cliente.id) }}" 
+       class="btn btn-warning">
+        <i class="bi bi-pencil"></i> Editar
+    </a>
+    <a href="{{ url_for('clientes') }}" 
+       class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Volver
+    </a>
+</div>
     </div>
 </div>
 
+<!-- Alerta de Estado -->
+{% if cliente.plan_vencido %}
+<div class="alert alert-danger" style="border-left: 5px solid #dc3545;">
+    <div class="d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill me-3" style="font-size: 36px;"></i>
+        <div>
+            <h5 class="alert-heading mb-1">⚠️ Plan Vencido</h5>
+            <p class="mb-0">Este estudiante necesita renovar su mensualidad urgentemente.</p>
+        </div>
+    </div>
+</div>
+{% elif cliente.dias_restantes is not none and cliente.dias_restantes <= 7 %}
+<div class="alert alert-warning" style="border-left: 5px solid #ffc107;">
+    <div class="d-flex align-items-center">
+        <i class="bi bi-clock-history me-3" style="font-size: 36px;"></i>
+        <div>
+            <h5 class="alert-heading mb-1">⏰ Plan Próximo a Vencer</h5>
+            <p class="mb-0">
+                Quedan <strong>{{ cliente.dias_restantes }} día{{ 's' if cliente.dias_restantes != 1 else '' }}</strong> 
+                hasta el vencimiento ({{ cliente.fecha_fin.strftime('%d/%m/%Y') }})
+            </p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row">
-    <!-- Información del Cliente -->
-    <div class="col-md-4 mb-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title"><i class="bi bi-person-vcard"></i> Datos del Cliente</h5>
+    <!-- COLUMNA IZQUIERDA: Información Personal y Académica -->
+    <div class="col-lg-4 mb-4">
+        <!-- Datos Personales -->
+        <div class="card mb-3" style="border-left: 5px solid #667eea;">
+            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-vcard"></i> Datos Personales
+                </h5>
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <h6 class="text-muted mb-1">Nombre Completo</h6>
-                    <p class="fw-bold">{{ cliente.nombre_completo }}</p>
+                    <h6 class="text-muted mb-1">
+                        <i class="bi bi-person"></i> Nombre Completo
+                    </h6>
+                    <p class="fw-bold mb-0">{{ cliente.nombre_completo }}</p>
                 </div>
-
-                <div class="mb-3">
-                    <h6 class="text-muted mb-1">Email</h6>
-                    <p>
-                        <i class="bi bi-envelope"></i> 
-                        <a href="mailto:{{ cliente.email }}">{{ cliente.email }}</a>
-                    </p>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>📧 Email:</strong> {{ cliente.email }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>🆔 Cédula:</strong> {{ cliente.cedula or 'No registrada' }}</p>
+                    </div>
                 </div>
-
                 {% if cliente.telefono %}
                 <div class="mb-3">
-                    <h6 class="text-muted mb-1">Teléfono</h6>
-                    <p>
-                        <i class="bi bi-phone"></i> 
-                        <a href="tel:{{ cliente.telefono }}">{{ cliente.telefono }}</a>
+                    <h6 class="text-muted mb-1">
+                        <i class="bi bi-phone"></i> Teléfono
+                    </h6>
+                    <p class="mb-0">
+                        <a href="tel:{{ cliente.telefono }}" class="text-decoration-none">
+                            {{ cliente.telefono }}
+                        </a>
                     </p>
                 </div>
                 {% endif %}
 
                 {% if cliente.direccion %}
                 <div class="mb-3">
-                    <h6 class="text-muted mb-1">Dirección</h6>
-                    <p><i class="bi bi-geo-alt"></i> {{ cliente.direccion }}</p>
+                    <h6 class="text-muted mb-1">
+                        <i class="bi bi-geo-alt"></i> Dirección
+                    </h6>
+                    <p class="mb-0">{{ cliente.direccion }}</p>
                 </div>
                 {% endif %}
 
-                <div class="mb-3">
-                    <h6 class="text-muted mb-1">Fecha de Inicio</h6>
-                    <p><i class="bi bi-calendar-check"></i> {{ cliente.fecha_inicio.strftime('%d/%m/%Y') }}</p>
-                </div>
-
-                <!-- Fecha de Fin -->
-                {% if cliente.fecha_fin %}
-                <div class="mb-3">
-                    <h6 class="text-muted mb-1">Fecha de Finalización</h6>
-                    <p>
-                        <i class="bi bi-calendar-x"></i> 
-                        {{ cliente.fecha_fin.strftime('%d/%m/%Y') }}
-                        
-                        {% if cliente.dias_restantes is not none %}
-                            {% if cliente.dias_restantes > 0 %}
-                                <br><small class="text-success">
-                                    <i class="bi bi-hourglass-split"></i> {{ cliente.dias_restantes }} días restantes
-                                </small>
-                            {% else %}
-                                <br><small class="text-danger">
-                                    <i class="bi bi-exclamation-triangle"></i> Plan vencido
-                                </small>
-                            {% endif %}
-                        {% endif %}
-                    </p>
-                </div>
-                {% endif %}
-
-                <div class="mb-3">
-                    <h6 class="text-muted mb-1">Estado</h6>
-                    <p>
+                <div class="mb-0">
+                    <h6 class="text-muted mb-1">
+                        <i class="bi bi-toggle-on"></i> Estado
+                    </h6>
+                    <p class="mb-0">
                         {% if cliente.activo %}
-                            <span class="badge bg-success">Activo</span>
+                            <span class="badge bg-success" style="font-size: 14px;">
+                                <i class="bi bi-check-circle"></i> Activo
+                            </span>
                         {% else %}
-                            <span class="badge bg-secondary">Inactivo</span>
+                            <span class="badge bg-secondary" style="font-size: 14px;">
+                                <i class="bi bi-x-circle"></i> Inactivo
+                            </span>
                         {% endif %}
                     </p>
                 </div>
+            </div>
+        </div>
 
-                {% if cliente.notas %}
+        <!-- Datos de Inscripción -->
+        <div class="card" style="border-left: 5px solid #28a745;">
+            <div class="card-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+                <h5 class="mb-0">
+                    <i class="bi bi-calendar-check"></i> Inscripción
+                </h5>
+            </div>
+            <div class="card-body">
                 <div class="mb-3">
-                    <h6 class="text-muted mb-1">Notas</h6>
-                    <p class="small">{{ cliente.notas }}</p>
+                    <h6 class="text-muted mb-1">
+                        <i class="bi bi-calendar-event"></i> Fecha de Registro
+                    </h6>
+                    <p class="mb-0">
+                        {{ cliente.fecha_registro.strftime('%d/%m/%Y') if cliente.fecha_registro else 'N/A' }}
+                    </p>
+                </div>
+
+                <div class="mb-3">
+                    <h6 class="text-muted mb-1">
+                        <i class="bi bi-calendar-plus"></i> Inicio de Clases
+                    </h6>
+                    <p class="mb-0">
+                        {{ cliente.fecha_inicio_clases.strftime('%d/%m/%Y') if cliente.fecha_inicio_clases else 'N/A' }}
+                    </p>
+                </div>
+
+                <div class="mb-3">
+                    <h6 class="text-muted mb-1">
+                        <i class="bi bi-cash-coin"></i> Valor Inscripción
+                    </h6>
+                    <p class="mb-0">
+                        <span class="badge bg-info" style="font-size: 14px;">
+                            ${{ "%.2f"|format(cliente.valor_inscripcion) }}
+                        </span>
+                    </p>
+                </div>
+
+                <div class="mb-3">
+                    <h6 class="text-muted mb-1">
+                        <i class="bi bi-check2-circle"></i> Mensualidades Canceladas
+                    </h6>
+                    <p class="mb-0">
+                        <span class="badge bg-primary" style="font-size: 14px;">
+                            {{ cliente.mensualidades_canceladas }}
+                        </span>
+                    </p>
+                </div>
+
+                {% if cliente.observaciones_inscripcion %}
+                <div class="mb-0">
+                    <h6 class="text-muted mb-1">
+                        <i class="bi bi-chat-left-text"></i> Observaciones
+                    </h6>
+                    <p class="small mb-0" style="white-space: pre-wrap;">{{ cliente.observaciones_inscripcion }}</p>
                 </div>
                 {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- Plan y Estado -->
-    <div class="col-md-8 mb-4">
-        <!-- Plan Actual -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title"><i class="bi bi-tags"></i> Plan Actual</h5>
+    <!-- COLUMNA DERECHA: Curso, Estado de Cuenta y Pagos -->
+    <div class="col-lg-8 mb-4">
+        <!-- Curso Actual -->
+        <div class="card mb-4" style="border: 3px solid #38ef7d; box-shadow: 0 4px 15px rgba(56, 239, 125, 0.2);">
+            <div class="card-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+                <h5 class="mb-0">
+                    <i class="bi bi-book-fill"></i> Curso Inscrito
+                </h5>
             </div>
             <div class="card-body">
-                {% if cliente.plan %}
-                <div class="row">
+                {% if cliente.curso %}
+                <div class="row align-items-center mb-3">
                     <div class="col-md-6">
-                        <h6 class="text-muted mb-1">Plan</h6>
-                        <h4>{{ cliente.plan.nombre }}</h4>
-                        {% if cliente.plan.descripcion %}
-                        <p class="text-muted small">{{ cliente.plan.descripcion }}</p>
+                        <h3 class="text-primary mb-2">{{ cliente.curso.nombre }}</h3>
+                        {% if cliente.curso.descripcion %}
+                        <p class="text-muted small mb-0">{{ cliente.curso.descripcion }}</p>
                         {% endif %}
                     </div>
-                    <div class="col-md-3">
-                        <h6 class="text-muted mb-1">Precio</h6>
-                        <h4 class="text-success">${{ "%.2f"|format(cliente.plan.precio) }}</h4>
+                    <div class="col-md-3 text-center">
+                        <h6 class="text-muted mb-1">Mensualidad</h6>
+                        <h2 class="text-success mb-0">
+                            ${{ "%.2f"|format(cliente.curso.precio_mensual) }}
+                        </h2>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-3 text-center">
                         <h6 class="text-muted mb-1">Duración</h6>
-                        <h4>{{ cliente.plan.duracion_dias }} días</h4>
+                        <h2 class="text-info mb-0">
+                            {{ cliente.curso.duracion_meses }} <small>meses</small>
+                        </h2>
                     </div>
                 </div>
                 
-                <!-- Alerta de plan vencido -->
-                {% if cliente.plan_vencido %}
-                <div class="alert alert-danger mt-3">
-                    <i class="bi bi-exclamation-triangle-fill"></i> 
-                    <strong>¡Plan Vencido!</strong> Este cliente necesita renovar su plan.
-                </div>
-                {% elif cliente.dias_restantes is not none and cliente.dias_restantes <= 7 %}
-                <div class="alert alert-warning mt-3">
-                    <i class="bi bi-clock-history"></i> 
-                    <strong>Plan próximo a vencer</strong> - Quedan {{ cliente.dias_restantes }} días
+                <!-- ✅ Información de Vencimiento (CORREGIDA) -->
+                {% if cliente.fecha_fin %}
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <h6 class="text-muted mb-1">
+                                    <i class="bi bi-calendar-x"></i> Próximo Vencimiento
+                                </h6>
+                                <h4 class="mb-0">{{ cliente.fecha_fin.strftime('%d/%m/%Y') }}</h4>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                {% if cliente.dias_restantes is not none %}
+                                    {% if cliente.estado_pago == 'pendiente-inicio' %}
+                                        <span class="badge bg-info text-dark" style="font-size: 16px; padding: 12px 20px;">
+                                            <i class="bi bi-calendar-plus"></i> Inicia en {{ cliente.dias_para_inicio }} día{{ 's' if cliente.dias_para_inicio != 1 else '' }}
+                                        </span>
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                Cobertura pagada: <strong>{{ cliente.dias_restantes }}</strong> día{{ 's' if cliente.dias_restantes != 1 else '' }} (se empieza a contar desde el inicio de clases)
+                                            </small>
+                                        </div>
+                                    {% elif cliente.dias_restantes > 7 %}
+                                        <span class="badge bg-success" style="font-size: 18px; padding: 12px 20px;">
+                                            <i class="bi bi-check-circle"></i> {{ cliente.dias_restantes }} días restantes
+                                        </span>
+                                    {% elif cliente.dias_restantes > 3 %}
+                                        <span class="badge bg-warning text-dark" style="font-size: 18px; padding: 12px 20px;">
+                                            <i class="bi bi-clock"></i> {{ cliente.dias_restantes }} días restantes
+                                        </span>
+                                    {% elif cliente.dias_restantes > 0 %}
+                                        <span class="badge bg-danger" style="font-size: 18px; padding: 12px 20px;">
+                                            <i class="bi bi-exclamation-triangle"></i> {{ cliente.dias_restantes }} días restantes
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-dark" style="font-size: 18px; padding: 12px 20px;">
+                                            <i class="bi bi-x-circle"></i> VENCIDO
+                                        </span>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 {% endif %}
                 {% else %}
-                <div class="text-center py-3">
-                    <i class="bi bi-exclamation-circle" style="font-size: 32px; color: #ccc;"></i>
-                    <p class="text-muted mt-2">No tiene plan asignado</p>
-                    <a href="{{ url_for('cliente_editar', id=cliente.id) }}" class="btn btn-sm btn-primary">
-                        Asignar Plan
+                <div class="text-center py-4">
+                    <i class="bi bi-exclamation-circle" style="font-size: 48px; color: #ccc;"></i>
+                    <p class="text-muted mt-2">No tiene curso asignado</p>
+                    <a href="{{ url_for('cliente_editar', id=cliente.id) }}" class="btn btn-primary">
+                        <i class="bi bi-book"></i> Asignar Curso
                     </a>
                 </div>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Estado de Pagos -->
-        <div class="card">
-            <div class="card-header">
-                <h5 class="card-title"><i class="bi bi-graph-up"></i> Estado de Cuenta</h5>
-            </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-md-4 mb-3">
-                        <div class="stat-card">
-                            <div class="stat-icon 
-                                {% if cliente.plan_vencido %}danger
-                                {% elif cliente.estado_pago == 'moroso' %}danger
-                                {% elif cliente.estado_pago == 'por-vencer' %}warning
-                                {% elif cliente.estado_pago == 'al-dia' %}success
-                                {% else %}primary{% endif %}">
-                                <i class="bi bi-
-                                    {% if cliente.plan_vencido %}x-circle
-                                    {% elif cliente.estado_pago == 'moroso' %}exclamation-triangle
-                                    {% elif cliente.estado_pago == 'por-vencer' %}clock
-                                    {% elif cliente.estado_pago == 'al-dia' %}check-circle
-                                    {% else %}info-circle{% endif %}"></i>
+      <!-- ✅ ESTADO DE CUENTA MEJORADO -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-graph-up"></i> Estado de Cuenta
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row text-center">
+            
+            <!-- ========================================== -->
+            <!-- TARJETA 1: ESTADO ACTUAL (MEJORADO) -->
+            <!-- ========================================== -->
+            <div class="col-md-4 mb-3">
+                {% set estado_info = {
+                    'sin-cobertura': {
+                        'color': '#667eea 0%, #764ba2 100%',
+                        'icono': 'exclamation-circle',
+                        'titulo': 'Sin Cobertura',
+                        'descripcion': 'Sin pagos registrados'
+                    },
+                    'pendiente-inicio': {
+                        'color': '#4facfe 0%, #00f2fe 100%',
+                        'icono': 'calendar-plus',
+                        'titulo': 'Pendiente Inicio',
+                        'descripcion': 'Clases aún no comienzan'
+                    },
+                    'vencido': {
+                        'color': '#fa709a 0%, #fee140 100%',
+                        'icono': 'x-circle',
+                        'titulo': 'Vencido',
+                        'descripcion': 'Requiere renovación urgente'
+                    },
+                    'por-vencer': {
+                        'color': '#f093fb 0%, #f5576c 100%',
+                        'icono': 'clock',
+                        'titulo': 'Próximo a Vencer',
+                        'descripcion': '7 días o menos'
+                    },
+                    'al-dia': {
+                        'color': '#11998e 0%, #38ef7d 100%',
+                        'icono': 'check-circle',
+                        'titulo': 'Al Día',
+                        'descripcion': 'Pago vigente'
+                    }
+                } %}
+                
+                {% set estado_actual = cliente.estado_pago %}
+                {% set info = estado_info.get(estado_actual, estado_info['sin-cobertura']) %}
+                
+                <div class="card h-100" style="background: linear-gradient(135deg, {{ info.color }}); color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                    <div class="card-body">
+                        <i class="bi bi-{{ info.icono }}" style="font-size: 48px; opacity: 0.9;"></i>
+                        <h6 class="mt-3 mb-1">Estado Actual</h6>
+                        <h4 class="mb-1 fw-bold">{{ info.titulo }}</h4>
+                        <small style="opacity: 0.9;">{{ info.descripcion }}</small>
+                        
+                        <!-- ✅ INFORMACIÓN ADICIONAL DINÁMICA -->
+                        {% if estado_actual == 'pendiente-inicio' and cliente.dias_para_inicio is not none %}
+                            <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.3);">
+                                <small class="fw-bold">Inicia en {{ cliente.dias_para_inicio }} día{{ 's' if cliente.dias_para_inicio != 1 else '' }}</small>
                             </div>
-                            <div class="stat-info">
-                                <h5>Estado</h5>
-                                <h3>
-                                    {% if cliente.plan_vencido %}Vencido
-                                    {% elif cliente.estado_pago == 'moroso' %}Moroso
-                                    {% elif cliente.estado_pago == 'por-vencer' %}Por Vencer
-                                    {% elif cliente.estado_pago == 'al-dia' %}Al Día
-                                    {% else %}Sin Pagos{% endif %}
-                                </h3>
+                        {% elif estado_actual == 'vencido' and cliente.dias_restantes is not none %}
+                            <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.3);">
+                                <small class="fw-bold">Vencido hace {{ abs(cliente.dias_restantes) }} día{{ 's' if abs(cliente.dias_restantes) != 1 else '' }}</small>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4 mb-3">
-                        <div class="stat-card">
-                            <div class="stat-icon danger">
-                                <i class="bi bi-cash-stack"></i>
+                        {% elif estado_actual == 'por-vencer' and cliente.dias_restantes is not none %}
+                            <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.3);">
+                                <small class="fw-bold">{{ cliente.dias_restantes }} día{{ 's' if cliente.dias_restantes != 1 else '' }} restantes</small>
                             </div>
-                            <div class="stat-info">
-                                <h5>Saldo Pendiente</h5>
-                                <h3>${{ "%.2f"|format(cliente.saldo_pendiente) }}</h3>
+                        {% elif estado_actual == 'al-dia' and cliente.dias_restantes is not none %}
+                            <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.3);">
+                                <small class="fw-bold">{{ cliente.dias_restantes }} día{{ 's' if cliente.dias_restantes != 1 else '' }} de cobertura</small>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4 mb-3">
-                        <div class="stat-card">
-                            <div class="stat-icon success">
-                                <i class="bi bi-currency-dollar"></i>
-                            </div>
-                            <div class="stat-info">
-                                <h5>Total Pagado</h5>
-                                <h3>${{ "%.2f"|format(pagos|sum(attribute='monto') if pagos else 0) }}</h3>
-                            </div>
-                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
+
+            <!-- ========================================== -->
+            <!-- TARJETA 2: SALDO PENDIENTE -->
+            <!-- ========================================== -->
+            <div class="col-md-4 mb-3">
+                <div class="card h-100" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                    <div class="card-body">
+                        <i class="bi bi-cash-stack" style="font-size: 48px; opacity: 0.9;"></i>
+                        <h6 class="mt-3 mb-1">Saldo Pendiente</h6>
+                        <h3 class="mb-1 fw-bold">${{ "%.2f"|format(cliente.saldo_pendiente) }}</h3>
+                        
+                        <!-- ✅ DESGLOSE DEL SALDO -->
+                        {% if cliente.saldo_pendiente > 0 %}
+                        <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.3);">
+                            <small>
+                                Total: ${{ "%.2f"|format(cliente.total_programa) }}<br>
+                                Pagado: ${{ "%.2f"|format(cliente.total_pagado) }}
+                            </small>
+                        </div>
+                        {% else %}
+                        <div class="mt-2">
+                            <small class="fw-bold">✅ Programa completado</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- ========================================== -->
+            <!-- TARJETA 3: TOTAL PAGADO -->
+            <!-- ========================================== -->
+            <div class="col-md-4 mb-3">
+                <div class="card h-100" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
+                    <div class="card-body">
+                        <i class="bi bi-currency-dollar" style="font-size: 48px; opacity: 0.9;"></i>
+                        <h6 class="mt-3 mb-1">Total Pagado</h6>
+                        <h3 class="mb-1 fw-bold">${{ "%.2f"|format(cliente.total_pagado) }}</h3>
+                        
+                        <!-- ✅ CANTIDAD DE PAGOS -->
+                        <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.3);">
+                            <small>
+                                {% if pagos %}
+                                    {{ pagos|length }} pago{{ 's' if pagos|length != 1 else '' }} registrado{{ 's' if pagos|length != 1 else '' }}
+                                {% else %}
+                                    Sin pagos aún
+                                {% endif %}
+                            </small>
+                        </div>
+                        
+                        <!-- ✅ MENSUALIDADES PAGADAS -->
+                        {% if cliente.mensualidades_canceladas > 0 %}
+                        <div class="mt-1">
+                            <small class="fw-bold">
+                                {{ cliente.mensualidades_canceladas }} mensualidad{{ 'es' if cliente.mensualidades_canceladas != 1 else '' }} pagada{{ 's' if cliente.mensualidades_canceladas != 1 else '' }}
+                            </small>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
         </div>
+        
+        <!-- ✅ BARRA DE PROGRESO DEL PROGRAMA -->
+        {% if cliente.total_programa > 0 %}
+        <div class="mt-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <small class="text-muted fw-bold">Progreso del Programa</small>
+                <small class="text-muted">
+                    {{ "%.0f"|format((cliente.total_pagado / cliente.total_programa) * 100) }}% completado
+                </small>
+            </div>
+            <div class="progress" style="height: 25px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     role="progressbar" 
+                     style="width: {{ "%.0f"|format((cliente.total_pagado / cliente.total_programa) * 100) }}%; 
+                            background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%);"
+                     aria-valuenow="{{ (cliente.total_pagado / cliente.total_programa) * 100 }}" 
+                     aria-valuemin="0" 
+                     aria-valuemax="100">
+                    <strong>${{ "%.2f"|format(cliente.total_pagado) }} / ${{ "%.2f"|format(cliente.total_programa) }}</strong>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
     </div>
 </div>
-
-<!-- Historial de Pagos -->
-<div class="row">
-    <div class="col-md-12">
+        <!-- Historial de Pagos -->
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="card-title"><i class="bi bi-clock-history"></i> Historial de Pagos</h5>
-                <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" class="btn btn-sm btn-success">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history"></i> Historial de Pagos
+                </h5>
+                <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" 
+                   class="btn btn-success btn-sm">
                     <i class="bi bi-plus-circle"></i> Nuevo Pago
                 </a>
             </div>
@@ -237,23 +459,25 @@
                 {% if pagos %}
                 <div class="table-responsive">
                     <table class="table table-hover">
-                        <thead>
+                        <thead class="table-light">
                             <tr>
                                 <th>Fecha</th>
                                 <th>Monto</th>
                                 <th>Método</th>
                                 <th>Referencia</th>
                                 <th>Periodo</th>
-                                <th>Notas</th>
-                                <th>Acciones</th>
+                                <th class="text-center">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for pago in pagos %}
                             <tr>
-                                <td>{{ pago.fecha_pago.strftime('%d/%m/%Y %H:%M') }}</td>
                                 <td>
-                                    <span class="badge bg-success fw-bold">
+                                    <strong>{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</strong><br>
+                                    <small class="text-muted">{{ pago.fecha_pago.strftime('%H:%M') }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success fw-bold" style="font-size: 13px;">
                                         ${{ "%.2f"|format(pago.monto) }}
                                     </span>
                                 </td>
@@ -264,45 +488,43 @@
                                         <span class="badge bg-secondary">N/A</span>
                                     {% endif %}
                                 </td>
-                                <td>{{ pago.referencia or '-' }}</td>
-                                <td>{{ pago.periodo or '-' }}</td>
                                 <td>
-                                    {% if pago.notas %}
-                                        <span title="{{ pago.notas }}">
-                                            {{ pago.notas[:30] }}{{ '...' if pago.notas|length > 30 else '' }}
-                                        </span>
+                                    {% if pago.referencia %}
+                                        <small class="font-monospace">{{ pago.referencia }}</small>
                                     {% else %}
-                                        -
+                                        <small class="text-muted">-</small>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td>{{ pago.periodo or '-' }}</td>
+                                <td class="text-center">
                                     <button type="button" 
                                             class="btn btn-sm btn-outline-danger" 
                                             onclick="confirmarEliminarPago({{ pago.id }}, {{ pago.monto }})"
-                                            title="Eliminar">
+                                            title="Eliminar"
+                                            data-bs-toggle="tooltip">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
-                        <tfoot>
-                            <tr class="table-light">
-                                <td colspan="1"><strong>TOTAL</strong></td>
-                                <td>
-                                    <strong class="text-success">
+                        <tfoot class="table-light">
+                            <tr>
+                                <td><strong>TOTAL</strong></td>
+                                <td colspan="5">
+                                    <strong class="text-success" style="font-size: 16px;">
                                         ${{ "%.2f"|format(pagos|sum(attribute='monto')) }}
                                     </strong>
+                                    <small class="text-muted ms-2">({{ pagos|length }} pago{{ 's' if pagos|length != 1 else '' }})</small>
                                 </td>
-                                <td colspan="5"></td>
                             </tr>
                         </tfoot>
                     </table>
                 </div>
                 {% else %}
                 <div class="text-center py-5">
-                    <i class="bi bi-inbox" style="font-size: 48px; color: #ccc;"></i>
-                    <p class="text-muted mt-3">No hay pagos registrados para este cliente</p>
+                    <i class="bi bi-inbox" style="font-size: 64px; color: #ccc;"></i>
+                    <p class="text-muted mt-3 mb-3">No hay pagos registrados para este estudiante</p>
                     <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" class="btn btn-success">
                         <i class="bi bi-plus-circle"></i> Registrar Primer Pago
                     </a>
@@ -316,8 +538,16 @@
 
 {% block extra_js %}
 <script>
+    // Inicializar tooltips
+    document.addEventListener('DOMContentLoaded', function() {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+
     function confirmarEliminarPago(pagoId, monto) {
-        if (confirm(`¿Estás seguro de eliminar este pago de $${monto.toFixed(2)}?\n\nEsta acción no se puede deshacer.`)) {
+        if (confirm(`¿Estás seguro de eliminar este pago de $${monto.toFixed(2)}?\n\n⚠️ Esta acción no se puede deshacer.`)) {
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = `/pagos/${pagoId}/eliminar`;
