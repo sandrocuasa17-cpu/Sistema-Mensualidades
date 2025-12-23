@@ -8,3 +8,4 @@ APScheduler==3.10.4
 gunicorn
 reportlab==4.0.7
 psycopg2-binary==2.9.9
+openpyxl==3.1.2
