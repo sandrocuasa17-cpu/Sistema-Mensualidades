@@ -18,7 +18,7 @@
     </div>
 </div>
 
-<!-- Estadísticas Mejoradas con Gráficos -->
+<!-- Estadísticas Mejoradas -->
 <div class="row mb-4">
     <div class="col-md-3 mb-3">
         <div class="card h-100 border-0 shadow-sm" style="border-left: 5px solid #28a745 !important;">
@@ -47,11 +47,14 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 class="text-muted mb-1">Total de Pagos</h6>
-                        <h2 class="mb-0 text-primary fw-bold">{{ pagos|length }}</h2>
+                        <h6 class="text-muted mb-1">Inscripciones</h6>
+                        {% set total_inscripciones = pagos|selectattr('concepto', 'equalto', 'inscripcion')|sum(attribute='monto') %}
+                        <h2 class="mb-0 text-primary fw-bold">
+                            ${{ "%.2f"|format(total_inscripciones or 0) }}
+                        </h2>
                         <small class="text-muted">
-                            <i class="bi bi-calendar"></i> 
-                            Histórico completo
+                            <i class="bi bi-file-earmark-text"></i> 
+                            Concepto inscripción
                         </small>
                     </div>
                     <div class="text-primary" style="font-size: 48px; opacity: 0.2;">
@@ -67,21 +70,18 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <h6 class="text-muted mb-1">Promedio por Pago</h6>
+                        <h6 class="text-muted mb-1">Mensualidades</h6>
+                        {% set total_mensualidades = pagos|selectattr('concepto', 'equalto', 'mensualidad')|sum(attribute='monto') %}
                         <h2 class="mb-0 text-warning fw-bold">
-                            {% if pagos %}
-                                ${{ "%.2f"|format((pagos|sum(attribute='monto')) / (pagos|length)) }}
-                            {% else %}
-                                $0.00
-                            {% endif %}
+                            ${{ "%.2f"|format(total_mensualidades or 0) }}
                         </h2>
                         <small class="text-muted">
-                            <i class="bi bi-graph-up"></i> 
-                            Ticket promedio
+                            <i class="bi bi-calendar-check"></i> 
+                            Concepto mensual
                         </small>
                     </div>
                     <div class="text-warning" style="font-size: 48px; opacity: 0.2;">
-                        <i class="bi bi-graph-up"></i>
+                        <i class="bi bi-calendar"></i>
                     </div>
                 </div>
             </div>
@@ -118,7 +118,7 @@
     </div>
 </div>
 
-<!-- Filtros Mejorados con más opciones -->
+<!-- Filtros -->
 <div class="card mb-4 shadow-sm border-0">
     <div class="card-header bg-white border-bottom">
         <h5 class="mb-0">
@@ -128,20 +128,17 @@
     <div class="card-body">
         <form method="GET" id="filtroForm">
             <div class="row align-items-end">
-                <!-- Búsqueda General -->
-                <div class="col-md-4 mb-3">
+                <div class="col-md-3 mb-3">
                     <label class="form-label fw-bold">
                         <i class="bi bi-search"></i> Buscar
                     </label>
                     <input type="text" 
                            class="form-control form-control-lg" 
                            name="busqueda"
-                           placeholder="Nombre, email, cédula, referencia..."
+                           placeholder="Nombre, email, cédula..."
                            value="{{ request.args.get('busqueda', '') }}">
-                    <small class="text-muted">Busca por cualquier campo del estudiante o pago</small>
                 </div>
                 
-                <!-- Fecha Desde -->
                 <div class="col-md-2 mb-3">
                     <label class="form-label fw-bold">
                         <i class="bi bi-calendar-event"></i> Desde
@@ -152,7 +149,6 @@
                            value="{{ request.args.get('fecha_inicio', '') }}">
                 </div>
                 
-                <!-- Fecha Hasta -->
                 <div class="col-md-2 mb-3">
                     <label class="form-label fw-bold">
                         <i class="bi bi-calendar-event"></i> Hasta
@@ -163,7 +159,24 @@
                            value="{{ request.args.get('fecha_fin', '') }}">
                 </div>
                 
-                <!-- Método de Pago -->
+                <div class="col-md-2 mb-3">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-tag"></i> Concepto
+                    </label>
+                    <select class="form-select" name="concepto">
+                        <option value="">Todos</option>
+                        <option value="inscripcion" {% if request.args.get('concepto') == 'inscripcion' %}selected{% endif %}>
+                            📄 Inscripción
+                        </option>
+                        <option value="mensualidad" {% if request.args.get('concepto') == 'mensualidad' %}selected{% endif %}>
+                            📅 Mensualidad
+                        </option>
+                        <option value="auto" {% if request.args.get('concepto') == 'auto' %}selected{% endif %}>
+                            🔄 Automático
+                        </option>
+                    </select>
+                </div>
+                
                 <div class="col-md-2 mb-3">
                     <label class="form-label fw-bold">
                         <i class="bi bi-credit-card"></i> Método
@@ -176,46 +189,26 @@
                         <option value="Depósito" {% if request.args.get('metodo') == 'Depósito' %}selected{% endif %}>🏧 Depósito</option>
                         <option value="PayPal" {% if request.args.get('metodo') == 'PayPal' %}selected{% endif %}>🅿️ PayPal</option>
                         <option value="Zelle" {% if request.args.get('metodo') == 'Zelle' %}selected{% endif %}>💸 Zelle</option>
-                        <option value="Otro" {% if request.args.get('metodo') == 'Otro' %}selected{% endif %}>📱 Otro</option>
                     </select>
                 </div>
                 
-                <!-- Botones -->
-                <div class="col-md-2 mb-3">
+                <div class="col-md-1 mb-3">
                     <button type="submit" class="btn btn-primary w-100 btn-lg">
-                        <i class="bi bi-filter"></i> Filtrar
+                        <i class="bi bi-filter"></i>
                     </button>
                 </div>
             </div>
             
-            <!-- Filtros Rápidos -->
-            <div class="row mt-2">
-                <div class="col-12">
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="filtrarHoy()">
-                            <i class="bi bi-calendar-day"></i> Hoy
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="filtrarEstaSemana()">
-                            <i class="bi bi-calendar-week"></i> Esta Semana
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="filtrarEsteMes()">
-                            <i class="bi bi-calendar-month"></i> Este Mes
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="filtrarUltimos30Dias()">
-                            <i class="bi bi-calendar-range"></i> Últimos 30 días
-                        </button>
-                    </div>
-                    
-                    {% if request.args.get('busqueda') or request.args.get('fecha_inicio') or request.args.get('metodo') %}
-                    <a href="{{ url_for('pagos') }}" class="btn btn-sm btn-outline-danger ms-2">
-                        <i class="bi bi-x-circle"></i> Limpiar Filtros
-                    </a>
-                    <span class="badge bg-info ms-2">
-                        Mostrando {{ pagos|length }} resultado(s) filtrado(s)
-                    </span>
-                    {% endif %}
-                </div>
+            {% if request.args.get('busqueda') or request.args.get('fecha_inicio') or request.args.get('metodo') or request.args.get('concepto') %}
+            <div class="mt-2">
+                <a href="{{ url_for('pagos') }}" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-x-circle"></i> Limpiar Filtros
+                </a>
+                <span class="badge bg-info ms-2">
+                    {{ pagos|length }} resultado(s)
+                </span>
             </div>
+            {% endif %}
         </form>
     </div>
 </div>
@@ -227,54 +220,53 @@
             <i class="bi bi-list"></i> Historial de Pagos 
             <span class="badge bg-primary">{{ pagos|length }}</span>
         </h5>
-       <a href="{{ url_for('reportes') }}" class="btn btn-sm btn-outline-success">
-    <i class="bi bi-file-earmark-excel"></i> Exportar
-</a>
+        <div>
+            <a href="{{ url_for('pagos_pdf') }}?{{ request.query_string.decode('utf-8') }}" 
+               class="btn btn-sm btn-outline-danger me-2"
+               title="Exportar a PDF">
+                <i class="bi bi-file-pdf"></i> PDF
+            </a>
+            <a href="{{ url_for('reportes') }}" class="btn btn-sm btn-outline-success">
+                <i class="bi bi-file-earmark-excel"></i> Excel
+            </a>
+        </div>
     </div>
     <div class="card-body p-0">
         {% if pagos %}
         <div class="table-responsive">
-            <table class="table table-hover mb-0" id="tablaPagos">
+            <table class="table table-hover mb-0 align-middle">
                 <thead class="table-light">
                     <tr>
                         <th style="width: 10%;">Fecha</th>
                         <th style="width: 18%;">Estudiante</th>
-                        <th style="width: 12%;">Curso</th>
+                        <th style="width: 10%;">Curso</th>
                         <th style="width: 10%;" class="text-end">Monto</th>
+                        <th style="width: 12%;">Concepto</th>
                         <th style="width: 10%;">Método</th>
-                        <th style="width: 12%;">Referencia</th>
-                        <th style="width: 10%;">Periodo</th>
-                        <th style="width: 8%;">Notas</th>
-                        <th style="width: 10%;" class="text-center no-print">Acciones</th>
+                        <th style="width: 10%;">Referencia</th>
+                        <th style="width: 8%;">Periodo</th>
+                        <th style="width: 6%;" class="text-center">Notas</th>
+                        <th style="width: 6%;" class="text-center">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for pago in pagos %}
                     <tr>
                         <td>
-                            <div class="d-flex flex-column">
-                                <strong class="text-primary">{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</strong>
-                                <small class="text-muted">
-                                    <i class="bi bi-clock"></i> {{ pago.fecha_pago.strftime('%H:%M') }}
-                                </small>
-                            </div>
+                            <strong class="text-primary">{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</strong><br>
+                            <small class="text-muted">
+                                <i class="bi bi-clock"></i> {{ pago.fecha_pago.strftime('%H:%M') }}
+                            </small>
                         </td>
                         <td>
-                            <div class="d-flex flex-column">
-                                <strong>{{ pago.cliente.nombre_completo }}</strong>
-                                <small class="text-muted">
-                                    <i class="bi bi-envelope"></i> {{ pago.cliente.email }}
-                                </small>
-                                {% if pago.cliente.cedula %}
-                                <small class="text-muted">
-                                    <i class="bi bi-person-badge"></i> {{ pago.cliente.cedula }}
-                                </small>
-                                {% endif %}
-                            </div>
+                            <strong>{{ pago.cliente.nombre_completo }}</strong><br>
+                            <small class="text-muted">
+                                <i class="bi bi-envelope"></i> {{ pago.cliente.email }}
+                            </small>
                         </td>
                         <td>
                             {% if pago.cliente.curso %}
-                                <span class="badge bg-info text-white">
+                                <span class="badge bg-info">
                                     <i class="bi bi-book"></i> {{ pago.cliente.curso.nombre }}
                                 </span>
                             {% else %}
@@ -285,6 +277,25 @@
                             <span class="badge bg-success fw-bold" style="font-size: 15px; padding: 8px 12px;">
                                 ${{ "%.2f"|format(pago.monto) }}
                             </span>
+                        </td>
+                        <td>
+                            {% if pago.concepto == 'inscripcion' %}
+                                <span class="badge bg-primary">
+                                    <i class="bi bi-file-earmark-text"></i> Inscripción
+                                </span>
+                            {% elif pago.concepto == 'mensualidad' %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-calendar-check"></i> Mensualidad
+                                </span>
+                            {% elif pago.concepto == 'auto' %}
+                                <span class="badge bg-info">
+                                    <i class="bi bi-magic"></i> Automático
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-question-circle"></i> Sin especificar
+                                </span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if pago.metodo_pago %}
@@ -321,63 +332,33 @@
                                 <small class="text-muted">-</small>
                             {% endif %}
                         </td>
-                        <td>
+                        
+                        <!-- Columna Notas -->
+                        <td class="text-center">
                             {% if pago.notas %}
                                 <button type="button" 
                                         class="btn btn-sm btn-outline-info" 
                                         data-bs-toggle="modal"
-                                        data-bs-target="#notasModal{{ pago.id }}">
+                                        data-bs-target="#notasModal{{ pago.id }}"
+                                        title="Ver notas">
                                     <i class="bi bi-chat-left-text"></i>
                                 </button>
-                                
-                                <!-- Modal para Notas -->
-                                <div class="modal fade" id="notasModal{{ pago.id }}" tabindex="-1">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title">
-                                                    <i class="bi bi-chat-left-text"></i> Notas del Pago
-                                                </h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                <div class="alert alert-info">
-                                                    <strong>Estudiante:</strong> {{ pago.cliente.nombre_completo }}<br>
-                                                    <strong>Monto:</strong> ${{ "%.2f"|format(pago.monto) }}<br>
-                                                    <strong>Fecha:</strong> {{ pago.fecha_pago.strftime('%d/%m/%Y %H:%M') }}
-                                                </div>
-                                                <p>{{ pago.notas }}</p>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
                             {% else %}
                                 <small class="text-muted">-</small>
                             {% endif %}
                         </td>
-                        <td class="text-center no-print">
+                        
+                        <td class="text-center">
                             <div class="btn-group" role="group">
                                 <a href="{{ url_for('cliente_detalle', id=pago.cliente_id) }}" 
                                    class="btn btn-sm btn-outline-primary" 
-                                   title="Ver Estudiante"
-                                   data-bs-toggle="tooltip">
+                                   title="Ver Estudiante">
                                     <i class="bi bi-person"></i>
                                 </a>
                                 <button type="button" 
-                                        class="btn btn-sm btn-outline-info" 
-                                        onclick="verDetallePago({{ pago.id }})"
-                                        title="Ver Detalle"
-                                        data-bs-toggle="tooltip">
-                                    <i class="bi bi-eye"></i>
-                                </button>
-                                <button type="button" 
                                         class="btn btn-sm btn-outline-danger" 
                                         onclick="confirmarEliminar({{ pago.id }}, '{{ pago.cliente.nombre_completo }}', {{ pago.monto }})"
-                                        title="Eliminar"
-                                        data-bs-toggle="tooltip">
+                                        title="Eliminar">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -389,7 +370,7 @@
                     <tr>
                         <td colspan="3">
                             <strong class="text-dark" style="font-size: 16px;">
-                                <i class="bi bi-calculator"></i> TOTAL GENERAL
+                                <i class="bi bi-calculator"></i> TOTALES
                             </strong>
                         </td>
                         <td class="text-end">
@@ -397,263 +378,118 @@
                                 ${{ "%.2f"|format(pagos|sum(attribute='monto')) }}
                             </strong>
                         </td>
-                        <td colspan="5"></td>
+                        <td colspan="6">
+                            <div class="d-flex gap-3">
+                                {% set total_inscripciones = pagos|selectattr('concepto', 'equalto', 'inscripcion')|sum(attribute='monto') %}
+                                {% set total_mensualidades = pagos|selectattr('concepto', 'equalto', 'mensualidad')|sum(attribute='monto') %}
+                                <small class="text-muted">
+                                    <i class="bi bi-file-earmark-text text-primary"></i> 
+                                    Inscripciones: <strong>${{ "%.2f"|format(total_inscripciones or 0) }}</strong>
+                                </small>
+                                <small class="text-muted">
+                                    <i class="bi bi-calendar-check text-success"></i> 
+                                    Mensualidades: <strong>${{ "%.2f"|format(total_mensualidades or 0) }}</strong>
+                                </small>
+                            </div>
+                        </td>
                     </tr>
                 </tfoot>
             </table>
         </div>
-
-        <!-- Análisis Detallado por Método de Pago -->
-        <div class="p-4 bg-light border-top">
-            <div class="row">
-                <div class="col-md-6 mb-4">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body">
-                            <h6 class="mb-3 text-primary">
-                                <i class="bi bi-pie-chart-fill"></i> Análisis por Método de Pago
-                            </h6>
-                            {% set metodos = {} %}
-                            {% set conteo_metodos = {} %}
-                            {% for pago in pagos %}
-                                {% set metodo = pago.metodo_pago or 'No especificado' %}
-                                {% if metodo in metodos %}
-                                    {% set _ = metodos.update({metodo: metodos[metodo] + pago.monto}) %}
-                                    {% set _ = conteo_metodos.update({metodo: conteo_metodos[metodo] + 1}) %}
-                                {% else %}
-                                    {% set _ = metodos.update({metodo: pago.monto}) %}
-                                    {% set _ = conteo_metodos.update({metodo: 1}) %}
-                                {% endif %}
-                            {% endfor %}
-                            
-                            <div class="table-responsive">
-                                <table class="table table-sm">
-                                    <thead>
-                                        <tr>
-                                            <th>Método</th>
-                                            <th class="text-center">Cantidad</th>
-                                            <th class="text-end">Total</th>
-                                            <th class="text-end">%</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% set total_general = pagos|sum(attribute='monto') %}
-                                        {% for metodo, total in metodos.items()|sort(attribute=1, reverse=True) %}
-                                        <tr>
-                                            <td>
-                                                <strong>{{ metodo }}</strong>
-                                            </td>
-                                            <td class="text-center">
-                                                <span class="badge bg-secondary">{{ conteo_metodos[metodo] }}</span>
-                                            </td>
-                                            <td class="text-end">
-                                                <strong class="text-success">${{ "%.2f"|format(total) }}</strong>
-                                            </td>
-                                            <td class="text-end">
-                                                {% set porcentaje = (total / total_general * 100) if total_general > 0 else 0 %}
-                                                <span class="badge bg-info">{{ "%.1f"|format(porcentaje) }}%</span>
-                                            </td>
-                                        </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                    <tfoot class="table-light">
-                                        <tr>
-                                            <td><strong>TOTAL</strong></td>
-                                            <td class="text-center">
-                                                <strong>{{ pagos|length }}</strong>
-                                            </td>
-                                            <td class="text-end">
-                                                <strong class="text-success">${{ "%.2f"|format(total_general) }}</strong>
-                                            </td>
-                                            <td class="text-end">
-                                                <strong>100%</strong>
-                                            </td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="col-md-6 mb-4">
-                    <div class="card border-0 shadow-sm">
-                        <div class="card-body">
-                            <h6 class="mb-3 text-primary">
-                                <i class="bi bi-graph-up"></i> Estadísticas Adicionales
-                            </h6>
-                            
-                            <div class="mb-3 p-3 bg-light rounded">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-muted">Pago más alto:</span>
-                                    <strong class="text-success">
-                                        ${{ "%.2f"|format(pagos|map(attribute='monto')|max if pagos else 0) }}
-                                    </strong>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-3 p-3 bg-light rounded">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-muted">Pago más bajo:</span>
-                                    <strong class="text-warning">
-                                        ${{ "%.2f"|format(pagos|map(attribute='monto')|min if pagos else 0) }}
-                                    </strong>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-3 p-3 bg-light rounded">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-muted">Promedio por pago:</span>
-                                    <strong class="text-primary">
-                                        {% if pagos %}
-                                            ${{ "%.2f"|format((pagos|sum(attribute='monto')) / (pagos|length)) }}
-                                        {% else %}
-                                            $0.00
-                                        {% endif %}
-                                    </strong>
-                                </div>
-                            </div>
-                            
-                            <div class="p-3 bg-light rounded">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span class="text-muted">Estudiantes únicos:</span>
-                                    <strong class="text-info">
-                                        {{ pagos|map(attribute='cliente_id')|unique|list|length if pagos else 0 }}
-                                    </strong>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
         {% else %}
         <div class="text-center py-5">
             <i class="bi bi-inbox" style="font-size: 64px; color: #ccc;"></i>
-            <h4 class="mt-3 text-muted">
-                {% if request.args.get('busqueda') or request.args.get('fecha_inicio') %}
-                    No se encontraron pagos con los filtros aplicados
-                {% else %}
-                    No hay pagos registrados
-                {% endif %}
-            </h4>
-            <p class="text-muted">
-                {% if request.args.get('busqueda') or request.args.get('fecha_inicio') %}
-                    Intenta con otros criterios de búsqueda
-                {% else %}
-                    Los pagos aparecerán aquí una vez que sean registrados
-                {% endif %}
-            </p>
-            {% if not request.args.get('busqueda') and not request.args.get('fecha_inicio') %}
+            <h4 class="mt-3 text-muted">No hay pagos registrados</h4>
+            <p class="text-muted">Los pagos aparecerán aquí una vez que sean registrados</p>
             <a href="{{ url_for('clientes') }}" class="btn btn-primary mt-3">
                 <i class="bi bi-people"></i> Ver Estudiantes
             </a>
-            {% endif %}
         </div>
         {% endif %}
     </div>
 </div>
+
+<!-- Modales de Notas -->
+{% for pago in pagos %}
+    {% if pago.notas %}
+    <div class="modal fade" id="notasModal{{ pago.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title">
+                        <i class="bi bi-chat-left-text"></i> Notas del Pago
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-light border mb-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Estudiante:</strong><br>
+                                {{ pago.cliente.nombre_completo }}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Monto:</strong><br>
+                                <span class="text-success fw-bold">${{ "%.2f"|format(pago.monto) }}</span>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Fecha:</strong> {{ pago.fecha_pago.strftime('%d/%m/%Y %H:%M') }}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Concepto:</strong> 
+                                {% if pago.concepto == 'inscripcion' %}
+                                    Inscripción
+                                {% elif pago.concepto == 'mensualidad' %}
+                                    Mensualidad
+                                {% else %}
+                                    Automático
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if pago.metodo_pago %}
+                        <div class="mt-2">
+                            <strong>Método:</strong> {{ pago.metodo_pago }}
+                        </div>
+                        {% endif %}
+                        {% if pago.referencia %}
+                        <div class="mt-2">
+                            <strong>Referencia:</strong> {{ pago.referencia }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="text-muted mb-2">
+                                <i class="bi bi-chat-quote"></i> Notas:
+                            </h6>
+                            <p class="mb-0" style="white-space: pre-wrap;">{{ pago.notas }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+{% endfor %}
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Inicializar tooltips
-    document.addEventListener('DOMContentLoaded', function() {
-        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-        tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-        });
-    });
-
-    function confirmarEliminar(pagoId, clienteNombre, monto) {
-        if (confirm(`¿Estás seguro de eliminar el pago de $${monto.toFixed(2)} de "${clienteNombre}"?\n\n⚠️ Esta acción no se puede deshacer.`)) {
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = `/pagos/${pagoId}/eliminar`;
-            document.body.appendChild(form);
-            form.submit();
-        }
+function confirmarEliminar(pagoId, clienteNombre, monto) {
+    if (confirm(`¿Estás seguro de eliminar el pago de $${monto.toFixed(2)} de "${clienteNombre}"?\n\n⚠️ Esta acción no se puede deshacer y recalculará la cobertura del estudiante.`)) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/pagos/${pagoId}/eliminar`;
+        document.body.appendChild(form);
+        form.submit();
     }
-
-    function imprimirPDF() {
-    // Mantener los mismos filtros actuales
-    const params = new URLSearchParams(window.location.search);
-    window.location.href = '{{ url_for("pagos_pdf") }}?' + params.toString();
 }
-    
-    function verDetallePago(pagoId) {
-        // Implementar modal de detalle si lo necesitas
-        alert('Detalle del pago #' + pagoId);
-    }
-
-    // Filtros rápidos
-    function filtrarHoy() {
-        const hoy = new Date().toISOString().split('T')[0];
-        document.querySelector('[name="fecha_inicio"]').value = hoy;
-        document.querySelector('[name="fecha_fin"]').value = hoy;
-        document.getElementById('filtroForm').submit();
-    }
-
-    function filtrarEstaSemana() {
-        const hoy = new Date();
-        const primerDia = new Date(hoy.setDate(hoy.getDate() - hoy.getDay()));
-        const ultimoDia = new Date(hoy.setDate(hoy.getDate() - hoy.getDay() + 6));
-        
-        document.querySelector('[name="fecha_inicio"]').value = primerDia.toISOString().split('T')[0];
-        document.querySelector('[name="fecha_fin"]').value = ultimoDia.toISOString().split('T')[0];
-        document.getElementById('filtroForm').submit();
-    }
-
-    function filtrarEsteMes() {
-        const hoy = new Date();
-        const primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-        const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
-        
-        document.querySelector('[name="fecha_inicio"]').value = primerDia.toISOString().split('T')[0];
-        document.querySelector('[name="fecha_fin"]').value = ultimoDia.toISOString().split('T')[0];
-        document.getElementById('filtroForm').submit();
-    }
-
-    function filtrarUltimos30Dias() {
-        const hoy = new Date();
-        const hace30Dias = new Date(hoy.getTime() - (30 * 24 * 60 * 60 * 1000));
-        
-        document.querySelector('[name="fecha_inicio"]').value = hace30Dias.toISOString().split('T')[0];
-        document.querySelector('[name="fecha_fin"]').value = hoy.toISOString().split('T')[0];
-        document.getElementById('filtroForm').submit();
-    }
 </script>
-
-<style>
-    @media print {
-        .no-print {
-            display: none !important;
-        }
-        .card {
-            border: none !important;
-            box-shadow: none !important;
-        }
-        .page-header, .card-header {
-            background: white !important;
-            color: black !important;
-        }
-        .btn-group {
-            display: none !important;
-        }
-    }
-    
-    .table tbody tr:hover {
-        background-color: #f8f9fa;
-        transition: background-color 0.2s ease;
-    }
-    
-    .card {
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-    
-    .card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
-    }
-</style>
 {% endblock %}

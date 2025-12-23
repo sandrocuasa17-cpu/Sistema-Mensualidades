@@ -26,6 +26,13 @@ from validadores import (
     validar_cedula_ecuador,
     validar_formulario_cliente
 )
+
+from helpers_pagos import (
+        calcular_distribucion_pago,
+        validar_pago,
+        obtener_sugerencias_pago,
+        generar_resumen_estado
+    )
 # Importar configuración centralizada
 from config import get_config
 
@@ -139,28 +146,12 @@ class Configuracion(db.Model):
         db.session.commit()
         return config
 
-        
-class Plan(db.Model):
-    """Planes de servicio/mensualidad"""
-    __tablename__ = 'plan'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100), nullable=False)
-    precio = db.Column(db.Float, nullable=False)
-    duracion_dias = db.Column(db.Integer, nullable=False, default=30)
-    descripcion = db.Column(db.Text)
-    activo = db.Column(db.Boolean, default=True, index=True)
-    fecha_creacion = db.Column(db.DateTime, default=datetime.now) 
-    
-    # Relaciones
-    clientes = db.relationship('Cliente', backref='plan', lazy=True)
-    
-    def __repr__(self):
-        return f'<Plan {self.nombre}>'
-
 
 class Curso(db.Model):
-    """Cursos disponibles en la institución"""
+    """
+    Cursos con duración INDEFINIDA
+    ✅ CAMBIO: Se eliminó duracion_meses (ahora es indefinido)
+    """
     __tablename__ = 'curso'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -168,11 +159,11 @@ class Curso(db.Model):
     descripcion = db.Column(db.Text)
     precio_mensual = db.Column(db.Float, nullable=False)
     precio_inscripcion = db.Column(db.Float, default=0)
-    duracion_meses = db.Column(db.Integer, default=12)
+    # ❌ ELIMINADO: duracion_meses (ahora indefinido)
     activo = db.Column(db.Boolean, default=True, index=True)
     fecha_creacion = db.Column(db.DateTime, default=datetime.now)
     
-    # ✅ CORRECCIÓN: Relación corregida con backref correcto
+    # Relación con estudiantes
     estudiantes = db.relationship('Cliente', backref='curso', lazy=True, foreign_keys='Cliente.curso_id')
     
     def __repr__(self):
@@ -180,39 +171,58 @@ class Curso(db.Model):
 
 
 class Cliente(db.Model):
-    """Clientes del sistema"""
+    """
+    Estudiantes del sistema
+    ✅ CAMBIO: Nuevo tracking separado para inscripción y mensualidades
+    """
     __tablename__ = 'cliente'
     
     # ===================================
-    # CAMPOS DE LA TABLA
+    # DATOS PERSONALES
     # ===================================
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False, index=True)
     apellido = db.Column(db.String(100), nullable=False, index=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    cedula = db.Column(db.String(20), unique=True, nullable=True, index=True) 
+    cedula = db.Column(db.String(20), unique=True, nullable=True, index=True)
     telefono = db.Column(db.String(20))
     direccion = db.Column(db.String(200))
     
-    # Relaciones con cursos y planes
+    # ===================================
+    # RELACIONES ACADÉMICAS
+    # ===================================
     curso_id = db.Column(db.Integer, db.ForeignKey('curso.id'), index=True)
-    plan_id = db.Column(db.Integer, db.ForeignKey('plan.id'), index=True)
+    plan_id = db.Column(db.Integer, db.ForeignKey('plan.id'), index=True)  # Legacy
     
-    # Fechas
-    fecha_inicio = db.Column(db.DateTime, default=datetime.now)
-    fecha_fin = db.Column(db.DateTime)
+    # ===================================
+    # ✅ NUEVO SISTEMA DE TRACKING DE PAGOS
+    # ===================================
+    # INSCRIPCIÓN (pago único)
+    abono_inscripcion = db.Column(db.Float, default=0)  # Cuánto ha pagado de inscripción
+    
+    # MENSUALIDADES (pagos recurrentes)
+    mensualidades_canceladas = db.Column(db.Integer, default=0)  # Meses COMPLETOS pagados
+    carry_mensualidad = db.Column(db.Float, default=0)  # Dinero acumulado para próxima mensualidad
+    
+    # ===================================
+    # FECHAS
+    # ===================================
     fecha_registro = db.Column(db.DateTime, default=datetime.now)
     fecha_inicio_clases = db.Column(db.DateTime)
+    fecha_fin = db.Column(db.DateTime)  # Fecha de vencimiento (basado en mensualidades)
+    fecha_inicio = db.Column(db.DateTime, default=datetime.now)  # Legacy
     fecha_creacion = db.Column(db.DateTime, default=datetime.now)
     fecha_actualizacion = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
-    # Campos adicionales
+    # ===================================
+    # OTROS
+    # ===================================
     activo = db.Column(db.Boolean, default=True, index=True)
     notas = db.Column(db.Text)
-    valor_inscripcion = db.Column(db.Float, default=0)
-    mensualidades_canceladas = db.Column(db.Integer, default=0)
     observaciones_inscripcion = db.Column(db.Text)
-
+    
+    # ❌ ELIMINADO: valor_inscripcion (se toma del curso automáticamente)
+    
     # Relaciones
     pagos = db.relationship('Pago', backref='cliente', lazy=True, cascade='all, delete-orphan')
 
@@ -220,23 +230,59 @@ class Cliente(db.Model):
         return f'<Cliente {self.nombre_completo}>'
 
     # ===================================
-    # PROPIEDADES CALCULADAS (CORREGIDAS)
+    # PROPIEDADES CALCULADAS
     # ===================================
+    
     @property
     def nombre_completo(self):
-        """Nombre completo del cliente"""
+        """Nombre completo del estudiante"""
         return f"{self.nombre} {self.apellido}"
     
     @property
+    def inscripcion_pendiente(self):
+        """
+        Saldo pendiente de inscripción
+        ✅ Se calcula automáticamente desde el curso
+        """
+        if not self.curso:
+            return 0
+        
+        total_inscripcion = float(self.curso.precio_inscripcion or 0)
+        abonado = float(self.abono_inscripcion or 0)
+        
+        return max(0, total_inscripcion - abonado)
+    
+    @property
+    def inscripcion_pagada(self):
+        """
+        True si la inscripción está completamente pagada
+        ✅ Tolerancia de $0.01 para errores de redondeo
+        """
+        return self.inscripcion_pendiente <= 0.01
+    
+    @property
+    def porcentaje_inscripcion(self):
+        """
+        Porcentaje de inscripción pagado (0-100)
+        """
+        if not self.curso or self.curso.precio_inscripcion <= 0:
+            return 100
+        
+        abonado = float(self.abono_inscripcion or 0)
+        total = float(self.curso.precio_inscripcion)
+        
+        return min(100, (abonado / total) * 100)
+    
+    @property
     def ha_iniciado_clases(self):
-        """True si ya llegó (o pasó) la fecha de inicio de clases."""
+        """True si ya llegó (o pasó) la fecha de inicio de clases"""
         if not self.fecha_inicio_clases:
-            return True  # si no hay fecha, asumimos que ya inició para no bloquear lógica
+            return True  # Sin fecha = asumimos que ya inició
         return datetime.now() >= self.fecha_inicio_clases
 
     @property
     def dias_para_inicio(self):
-        """Días que faltan para iniciar clases (0 si ya inició o no hay fecha)."""
+        """Días que faltan para iniciar clases (0 si ya inició)"""
         if not self.fecha_inicio_clases:
             return 0
         dias = (self.fecha_inicio_clases - datetime.now()).days
@@ -244,12 +290,12 @@ class Cliente(db.Model):
 
     @property
     def dias_restantes(self):
-        """Días restantes de cobertura.
-
-        Regla clave:
-        - Si el estudiante aún NO inicia clases, la cobertura NO debe ir disminuyendo.
-          En ese caso devolvemos los días de cobertura TOTAL (fecha_fin - fecha_inicio_clases).
-        - Si ya inició clases, devolvemos los días hasta fecha_fin (fecha_fin - hoy).
+        """
+        Días restantes de cobertura
+        
+        LÓGICA:
+        - Si aún no inicia clases: días de cobertura TOTAL
+        - Si ya inició: días hasta fecha_fin
         """
         if not self.fecha_fin:
             return None
@@ -263,7 +309,7 @@ class Cliente(db.Model):
 
     @property
     def plan_vencido(self):
-        """Vencido = fecha_fin pasada (pero solo si ya inició clases)."""
+        """Vencido = fecha_fin pasada (pero solo si ya inició clases)"""
         if not self.fecha_fin:
             return False
 
@@ -275,7 +321,10 @@ class Cliente(db.Model):
 
     @property
     def proximo_a_vencer(self):
-        """Próximo a vencer (0-7 días), solo si ya inició clases y ya pagó al menos 1 mensualidad."""
+        """
+        Próximo a vencer (0-7 días)
+        Solo si ya inició clases y tiene al menos 1 mensualidad pagada
+        """
         if not self.fecha_fin:
             return False
         if self.mensualidades_canceladas == 0:
@@ -290,14 +339,15 @@ class Cliente(db.Model):
 
     @property
     def estado_pago(self):
-        """Estado coherente con UI.
-
-        Estados:
-        - sin-cobertura: no hay fecha_fin o no tiene mensualidades pagadas
-        - pendiente-inicio: pagó (>=1), pero aún no inicia clases
-        - vencido: fecha_fin pasada (y ya inició)
-        - por-vencer: 0-7 días (y ya inició)
-        - al-dia: >7 días (y ya inició)
+        """
+        Estado de pago del estudiante
+        
+        Estados posibles:
+        - sin-cobertura: No tiene fecha_fin o 0 mensualidades
+        - pendiente-inicio: Pagó pero aún no inicia clases
+        - vencido: fecha_fin pasada
+        - por-vencer: 0-7 días restantes
+        - al-dia: >7 días restantes
         """
         if not self.fecha_fin or self.mensualidades_canceladas == 0:
             return 'sin-cobertura'
@@ -318,39 +368,47 @@ class Cliente(db.Model):
 
     @property
     def total_programa(self):
-        """Total a pagar por TODO el programa (curso + inscripción)."""
+        """
+        Total a pagar por TODO el programa
+        ✅ NOTA: Como la duración es indefinida, esto es solo referencial
+        """
         total = 0.0
 
-        # Inscripción (guardada en cliente)
-        total += float(self.valor_inscripcion or 0)
-
-        # Curso
-        if getattr(self, "curso", None):
-            total += float(self.curso.precio_mensual or 0) * int(self.curso.duracion_meses or 0)
-        elif getattr(self, "plan", None):
-            # fallback si algún cliente todavía usa plan
-            total += float(self.plan.precio or 0) * int((self.plan.duracion_dias or 30) // 30)
+        # Inscripción
+        if self.curso:
+            total += float(self.curso.precio_inscripcion or 0)
 
         return round(total, 2)
 
     @property
     def total_pagado(self):
-        """Total pagado por el estudiante (suma de pagos)."""
+        """Total pagado por el estudiante (suma de todos los pagos)"""
         return round(sum(float(p.monto or 0) for p in self.pagos), 2)
 
     @property
     def saldo_pendiente(self):
-        """Saldo pendiente REAL del programa."""
-        return round(max(0.0, self.total_programa - self.total_pagado), 2)
+        """
+        Saldo pendiente SOLO de inscripción
+        (Las mensualidades son indefinidas, no tienen "saldo pendiente" fijo)
+        """
+        return round(self.inscripcion_pendiente, 2)
+
 
 class Pago(db.Model):
-    """Pagos realizados por clientes"""
+    """
+    Pagos realizados por estudiantes
+    ✅ NUEVO: Campo 'concepto' para identificar tipo de pago
+    """
     __tablename__ = 'pago'
     
     id = db.Column(db.Integer, primary_key=True)
     cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False, index=True)
     monto = db.Column(db.Float, nullable=False)
     fecha_pago = db.Column(db.DateTime, default=datetime.now, index=True)
+    
+    # ✅ NUEVO: Concepto del pago
+    concepto = db.Column(db.String(20), default='auto')  # 'auto', 'inscripcion', 'mensualidad'
+    
     metodo_pago = db.Column(db.String(50))
     referencia = db.Column(db.String(100))
     notas = db.Column(db.Text)
@@ -360,75 +418,218 @@ class Pago(db.Model):
         return f'<Pago ${self.monto} - {self.cliente.nombre_completo}>'
 
 
+class Plan(db.Model):
+    """
+    Planes de servicio (LEGACY - mantener para compatibilidad)
+    """
+    __tablename__ = 'plan'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    precio = db.Column(db.Float, nullable=False)
+    duracion_dias = db.Column(db.Integer, nullable=False, default=30)
+    descripcion = db.Column(db.Text)
+    activo = db.Column(db.Boolean, default=True, index=True)
+    fecha_creacion = db.Column(db.DateTime, default=datetime.now)
+    
+    clientes = db.relationship('Cliente', backref='plan', lazy=True)
+    
+    def __repr__(self):
+        return f'<Plan {self.nombre}>'
 
 def _recalcular_cobertura_cliente(cliente):
     """
-    Recalcula cobertura de forma ULTRA ROBUSTA.
-    Maneja eliminación de pagos correctamente.
+    Recalcula la cobertura del estudiante con sistema de abonos inteligente
+    
+    CARACTERÍSTICAS:
+    ✅ Permite abonos parciales a inscripción
+    ✅ Permite abonos parciales a mensualidades
+    ✅ Distribución automática: primero inscripción, luego mensualidades
+    ✅ Acumula crédito (carry) para completar mensualidades
+    ✅ Calcula cobertura exacta (30 días por mensualidad completa)
+    
+    FLUJO:
+    1. Validar que tenga curso y fecha de inicio
+    2. Obtener todos los pagos ordenados cronológicamente
+    3. Procesar cada pago:
+       - Primero cubrir inscripción (si está pendiente)
+       - Luego acumular para mensualidades
+    4. Calcular mensualidades completas
+    5. Actualizar fecha de vencimiento
+    
+    Args:
+        cliente: Objeto Cliente a recalcular
+    
+    Returns:
+        dict con:
+        - inscripcion_completa (bool)
+        - abono_inscripcion (float)
+        - inscripcion_pendiente (float)
+        - total_meses (int)
+        - carry (float)
+        - fecha_fin (datetime)
     """
-    # Validar curso
+    
+    # ===================================
+    # 1. VALIDACIONES BÁSICAS
+    # ===================================
     if not getattr(cliente, "curso", None):
         cliente.mensualidades_canceladas = 0
         cliente.fecha_fin = None
-        return {"total_meses": 0, "carry": 0.0, "fecha_fin": None}
+        cliente.abono_inscripcion = 0
+        cliente.carry_mensualidad = 0
+        return {
+            "inscripcion_completa": False,
+            "abono_inscripcion": 0,
+            "inscripcion_pendiente": 0,
+            "total_meses": 0,
+            "carry": 0,
+            "fecha_fin": None
+        }
     
-    # Validar precio
     try:
-        precio = float(cliente.curso.precio_mensual)
+        precio_mensual = float(cliente.curso.precio_mensual)
+        precio_inscripcion = float(cliente.curso.precio_inscripcion or 0)
     except (TypeError, ValueError, AttributeError):
-        precio = 0.0
+        precio_mensual = 0.0
+        precio_inscripcion = 0.0
     
-    if precio <= 0:
+    if precio_mensual <= 0:
         cliente.mensualidades_canceladas = 0
         cliente.fecha_fin = None
-        return {"total_meses": 0, "carry": 0.0, "fecha_fin": None}
+        cliente.abono_inscripcion = 0
+        cliente.carry_mensualidad = 0
+        return {
+            "inscripcion_completa": False,
+            "abono_inscripcion": 0,
+            "inscripcion_pendiente": 0,
+            "total_meses": 0,
+            "carry": 0,
+            "fecha_fin": None
+        }
     
-    # Validar fecha inicio
     if not getattr(cliente, "fecha_inicio_clases", None):
         cliente.mensualidades_canceladas = 0
         cliente.fecha_fin = None
-        return {"total_meses": 0, "carry": 0.0, "fecha_fin": None}
+        cliente.abono_inscripcion = 0
+        cliente.carry_mensualidad = 0
+        return {
+            "inscripcion_completa": False,
+            "abono_inscripcion": 0,
+            "inscripcion_pendiente": 0,
+            "total_meses": 0,
+            "carry": 0,
+            "fecha_fin": None
+        }
     
-    # ✅ MEJORA: Refrescar pagos desde BD (crítico si se eliminó uno)
-    from sqlalchemy.orm import Session
-    from flask import current_app
-    
+    # ===================================
+    # 2. OBTENER Y ORDENAR PAGOS
+    # ===================================
     try:
-        # Refrescar relación desde BD
         db.session.refresh(cliente, ['pagos'])
-    except Exception as e:
-        current_app.logger.warning(f"⚠️ No se pudo refrescar pagos: {e}")
-    
+    except Exception:
+        pass
+
     # Ordenar pagos cronológicamente
     pagos = sorted(
         list(cliente.pagos),
         key=lambda p: p.fecha_pago or datetime.now()
     )
     
-    total_meses = 0
-    carry = 0.0
+    # ===================================
+    # 3. PROCESAR PAGOS CON SISTEMA DE ABONOS
+    # ===================================
     
-    # Procesar cada pago
+    # Variables de tracking
+    abono_inscripcion_acumulado = 0.0
+    carry_mensualidades = 0.0
+    total_meses = 0
+    
     for pago in pagos:
         try:
             monto = float(pago.monto or 0)
+            concepto = getattr(pago, 'concepto', 'auto') or 'auto'
         except (TypeError, ValueError):
             continue
         
         if monto <= 0:
             continue
         
-        carry += monto
+        saldo_disponible = monto
         
-        # Calcular mensualidades completas
-        meses_completos = int(carry // precio)
+        # ====================================
+        # CONCEPTO: AUTOMÁTICO (distribución inteligente)
+        # ====================================
+        if concepto == 'auto':
+            # PASO 1: Cubrir inscripción primero
+            if precio_inscripcion > 0 and abono_inscripcion_acumulado < precio_inscripcion:
+                falta_inscripcion = precio_inscripcion - abono_inscripcion_acumulado
+                
+                if saldo_disponible >= falta_inscripcion:
+                    # Completa la inscripción
+                    abono_inscripcion_acumulado = precio_inscripcion
+                    saldo_disponible -= falta_inscripcion
+                    app.logger.info(f"✅ Inscripción COMPLETADA con pago #{pago.id}")
+                else:
+                    # Abono parcial a inscripción
+                    abono_inscripcion_acumulado += saldo_disponible
+                    app.logger.info(
+                        f"💰 Abono inscripción: ${saldo_disponible:.2f} "
+                        f"(total: ${abono_inscripcion_acumulado:.2f}/${precio_inscripcion:.2f})"
+                    )
+                    saldo_disponible = 0
+            
+            # PASO 2: Lo que sobra va a mensualidades
+            if saldo_disponible > 0:
+                carry_mensualidades += saldo_disponible
+                
+                # Calcular mensualidades completas
+                meses_completos = int(carry_mensualidades // precio_mensual)
+                
+                if meses_completos > 0:
+                    total_meses += meses_completos
+                    carry_mensualidades = round(carry_mensualidades - (meses_completos * precio_mensual), 2)
+                    app.logger.info(
+                        f"✅ {meses_completos} mensualidad(es) completada(s). "
+                        f"Carry: ${carry_mensualidades:.2f}"
+                    )
         
-        if meses_completos > 0:
-            total_meses += meses_completos
-            carry = round(carry - (meses_completos * precio), 2)
+        # ====================================
+        # CONCEPTO: SOLO INSCRIPCIÓN
+        # ====================================
+        elif concepto == 'inscripcion':
+            if precio_inscripcion > 0:
+                falta_inscripcion = max(0, precio_inscripcion - abono_inscripcion_acumulado)
+                
+                if falta_inscripcion > 0:
+                    abono = min(saldo_disponible, falta_inscripcion)
+                    abono_inscripcion_acumulado += abono
+                    app.logger.info(
+                        f"💰 Abono inscripción (concepto específico): ${abono:.2f}"
+                    )
+        
+        # ====================================
+        # CONCEPTO: SOLO MENSUALIDAD
+        # ====================================
+        elif concepto == 'mensualidad':
+            carry_mensualidades += saldo_disponible
+            
+            meses_completos = int(carry_mensualidades // precio_mensual)
+            
+            if meses_completos > 0:
+                total_meses += meses_completos
+                carry_mensualidades = round(carry_mensualidades - (meses_completos * precio_mensual), 2)
+                app.logger.info(
+                    f"✅ {meses_completos} mensualidad(es) - concepto específico. "
+                    f"Carry: ${carry_mensualidades:.2f}"
+                )
     
-    # Actualizar cliente
+    # ===================================
+    # 4. ACTUALIZAR CLIENTE
+    # ===================================
+    cliente.abono_inscripcion = round(abono_inscripcion_acumulado, 2)
     cliente.mensualidades_canceladas = int(total_meses)
+    cliente.carry_mensualidad = round(carry_mensualidades, 2)
     
     # Calcular fecha fin
     if total_meses <= 0:
@@ -436,9 +637,29 @@ def _recalcular_cobertura_cliente(cliente):
     else:
         cliente.fecha_fin = cliente.fecha_inicio_clases + timedelta(days=total_meses * 30)
     
+    inscripcion_completa = (abono_inscripcion_acumulado >= precio_inscripcion) if precio_inscripcion > 0 else True
+    inscripcion_pendiente = max(0, precio_inscripcion - abono_inscripcion_acumulado)
+    
+    # ===================================
+    # 5. LOG DETALLADO
+    # ===================================
+    app.logger.info(f"""
+    📊 RECÁLCULO DE COBERTURA: {cliente.nombre_completo}
+    {'='*60}
+    💵 Total pagado: ${sum(p.monto for p in pagos):.2f}
+    📝 Inscripción: ${abono_inscripcion_acumulado:.2f} / ${precio_inscripcion:.2f} {'✅' if inscripcion_completa else '❌'}
+    📅 Mensualidades: {total_meses} completas
+    💰 Carry mensualidades: ${carry_mensualidades:.2f}
+    🗓️ Fecha fin: {cliente.fecha_fin.strftime('%d/%m/%Y') if cliente.fecha_fin else 'N/A'}
+    {'='*60}
+    """)
+    
     return {
+        "inscripcion_completa": inscripcion_completa,
+        "abono_inscripcion": abono_inscripcion_acumulado,
+        "inscripcion_pendiente": inscripcion_pendiente,
         "total_meses": total_meses,
-        "carry": carry,
+        "carry": carry_mensualidades,
         "fecha_fin": cliente.fecha_fin
     }
 def requiere_licencia_y_auth(f):
@@ -559,77 +780,76 @@ def cursos():
         return render_template('cursos/lista.html', cursos=[])
 
 
+# ============================================
+# RUTAS DE CURSOS - ACTUALIZADAS
+# ============================================
+
 @app.route('/cursos/nuevo', methods=['GET', 'POST'])
 @requiere_licencia_y_auth
 def curso_nuevo():
-    """Crear nuevo curso"""
+    """Crear nuevo curso (sin duración)"""
     if request.method == 'POST':
         try:
             precio_mensual = float(request.form.get('precio_mensual', 0))
             precio_inscripcion = float(request.form.get('precio_inscripcion', 0))
-            duracion_meses = int(request.form.get('duracion_meses', 12))
-            
+
             if precio_mensual <= 0:
                 flash('El precio mensual debe ser mayor a 0', 'danger')
                 return redirect(url_for('curso_nuevo'))
-            
+
             curso = Curso(
                 nombre=request.form['nombre'].strip(),
                 descripcion=request.form.get('descripcion', '').strip() or None,
                 precio_mensual=precio_mensual,
-                precio_inscripcion=precio_inscripcion,
-                duracion_meses=duracion_meses
+                precio_inscripcion=precio_inscripcion
             )
-            
+
             db.session.add(curso)
             db.session.commit()
-            
-            app.logger.info(f'Curso creado: {curso.nombre}')
+
+            app.logger.info(f'✅ Curso creado: {curso.nombre}')
             flash(f'✅ Curso {curso.nombre} creado exitosamente', 'success')
             return redirect(url_for('cursos'))
-            
+
         except Exception as e:
             db.session.rollback()
-            app.logger.error(f'Error creando curso: {e}')
+            app.logger.error(f'❌ Error creando curso: {e}')
             flash('Error al crear el curso', 'danger')
-    
+
     return render_template('cursos/formulario.html', curso=None)
 
 
 @app.route('/cursos/<int:id>/editar', methods=['GET', 'POST'])
 @requiere_licencia_y_auth
 def curso_editar(id):
-    """Editar un curso"""
     curso = Curso.query.get_or_404(id)
-    
+
     if request.method == 'POST':
         try:
             precio_mensual = float(request.form.get('precio_mensual', 0))
             precio_inscripcion = float(request.form.get('precio_inscripcion', 0))
-            duracion_meses = int(request.form.get('duracion_meses', 12))
-            
+
             if precio_mensual <= 0:
                 flash('El precio mensual debe ser mayor a 0', 'danger')
                 return redirect(url_for('curso_editar', id=id))
-            
+
             curso.nombre = request.form['nombre'].strip()
             curso.descripcion = request.form.get('descripcion', '').strip() or None
             curso.precio_mensual = precio_mensual
             curso.precio_inscripcion = precio_inscripcion
-            curso.duracion_meses = duracion_meses
             curso.activo = 'activo' in request.form
-            
+
             db.session.commit()
-            
-            app.logger.info(f'Curso actualizado: {curso.nombre}')
+
+            app.logger.info(f'✅ Curso actualizado: {curso.nombre}')
             flash(f'✅ Curso {curso.nombre} actualizado exitosamente', 'success')
             return redirect(url_for('cursos'))
-            
+
         except Exception as e:
             db.session.rollback()
-            app.logger.error(f'Error actualizando curso {id}: {e}')
+            app.logger.error(f'❌ Error actualizando curso {id}: {e}')
             flash('Error al actualizar el curso', 'danger')
-    
+
     return render_template('cursos/formulario.html', curso=curso)
 
 
@@ -1301,39 +1521,40 @@ def index():
 @app.route('/clientes')
 @requiere_licencia_y_auth
 def clientes():
-    """Lista de clientes con búsqueda mejorada (incluye cédula)"""
+    """Lista de todos los clientes"""
     try:
         busqueda = request.args.get('busqueda', '').strip()
         
         if busqueda:
-            # ✅ Búsqueda mejorada: incluye cédula
+            # Búsqueda por nombre, apellido, email o cédula
             clientes = Cliente.query.filter(
                 or_(
-                    Cliente.nombre.contains(busqueda),
-                    Cliente.apellido.contains(busqueda),
-                    Cliente.email.contains(busqueda),
-                    Cliente.cedula.contains(busqueda) if busqueda else False
+                    Cliente.nombre.ilike(f'%{busqueda}%'),
+                    Cliente.apellido.ilike(f'%{busqueda}%'),
+                    Cliente.email.ilike(f'%{busqueda}%'),
+                    Cliente.cedula.ilike(f'%{busqueda}%') if busqueda else False
                 )
-            ).all()
-            
-            app.logger.info(f"🔍 Búsqueda: '{busqueda}' - {len(clientes)} resultados")
+            ).order_by(Cliente.fecha_creacion.desc()).all()
         else:
+            # Todos los clientes
             clientes = Cliente.query.order_by(Cliente.fecha_creacion.desc()).all()
         
-        planes = Plan.query.filter_by(activo=True).all()
-        
-        return render_template('clientes/lista.html', clientes=clientes, planes=planes)
+        # ✅ IMPORTANTE: Pasar 'clientes' (plural), NO 'cliente'
+        return render_template('clientes/lista.html', clientes=clientes)
         
     except Exception as e:
-        app.logger.error(f'❌ Error en lista clientes: {e}')
-        import traceback
-        app.logger.error(traceback.format_exc())
-        flash('Error cargando clientes', 'danger')
-        return render_template('clientes/lista.html', clientes=[], planes=[])
+        app.logger.error(f'Error en lista clientes: {e}')
+        flash('❌ Error cargando la lista de estudiantes', 'danger')
+        return render_template('clientes/lista.html', clientes=[])
+
+# ============================================
+# RUTAS DE CLIENTES - INSCRIPCIÓN MEJORADA
+# ============================================
+
 @app.route('/clientes/nuevo', methods=['GET', 'POST'])
 @requiere_licencia_y_auth
 def cliente_nuevo():
-    """Inscribir nuevo estudiante con validaciones mejoradas"""
+    """Inscribir nuevo estudiante (inscripción automática desde curso)"""
     if request.method == 'POST':
         try:
             # ===================================
@@ -1359,7 +1580,6 @@ def cliente_nuevo():
             # ===================================
             cedula = request.form.get('cedula', '').strip()
             if cedula:
-                # Verificar unicidad
                 cedula_existe = Cliente.query.filter_by(cedula=cedula).first()
                 if cedula_existe:
                     flash(f'❌ Ya existe un estudiante con la cédula {cedula}', 'danger')
@@ -1407,10 +1627,9 @@ def cliente_nuevo():
                 fecha_fin = fecha_inicio_clases + timedelta(days=dias_cubiertos)
             
             # ===================================
-            # 7. VALOR DE INSCRIPCIÓN
+            # 7. ✅ VALOR DE INSCRIPCIÓN AUTOMÁTICO DESDE CURSO
             # ===================================
-            valor_inscripcion_input = request.form.get('valor_inscripcion', '').strip()
-            valor_inscripcion = float(valor_inscripcion_input) if valor_inscripcion_input else curso.precio_inscripcion
+            valor_inscripcion = curso.precio_inscripcion  # ✅ Se toma del curso automáticamente
             
             # ===================================
             # 8. CREAR ESTUDIANTE
@@ -1419,7 +1638,7 @@ def cliente_nuevo():
                 nombre=request.form['nombre'].strip(),
                 apellido=request.form['apellido'].strip(),
                 email=email,
-                cedula=cedula or None,  # ✅ Incluir cédula
+                cedula=cedula or None,
                 telefono=request.form.get('telefono', '').strip() or None,
                 direccion=request.form.get('direccion', '').strip() or None,
                 curso_id=curso_id,
@@ -1428,7 +1647,6 @@ def cliente_nuevo():
                 fecha_inicio_clases=fecha_inicio_clases,
                 fecha_inicio=fecha_registro,
                 fecha_fin=fecha_fin,
-                valor_inscripcion=valor_inscripcion,
                 mensualidades_canceladas=mensualidades_canceladas,
                 observaciones_inscripcion=request.form.get('observaciones_inscripcion', '').strip() or None,
                 notas=request.form.get('notas', '').strip() or None,
@@ -1445,6 +1663,7 @@ def cliente_nuevo():
                 f'✅ Inscripción: {cliente.nombre_completo} - '
                 f'Cédula: {cliente.cedula or "N/A"} - '
                 f'Curso: {curso.nombre} - '
+                f'Inscripción: ${valor_inscripcion:.2f} - '
                 f'Cobertura: {mensualidades_canceladas} meses'
             )
             
@@ -1471,39 +1690,53 @@ def cliente_nuevo():
                          planes=planes)
 
 @app.route('/clientes/<int:id>')
-@requiere_licencia_y_auth  # ✅ CAMBIO AQUÍ
+@requiere_licencia_y_auth
 def cliente_detalle(id):
-    """Detalle de un cliente"""
+    """Detalle de un cliente - VERSION CORREGIDA"""
     try:
-        cliente = Cliente.query.get_or_404(id)
-        pagos = Pago.query.filter_by(cliente_id=id).order_by(Pago.fecha_pago.desc()).all()
-        return render_template('clientes/detalle.html', cliente=cliente, pagos=pagos)
+        # 1. Buscar cliente
+        cliente = Cliente.query.get(id)
+        
+        # 2. Si no existe, mostrar error claro
+        if not cliente:
+            app.logger.warning(f'❌ Cliente {id} no encontrado')
+            flash(f'❌ No se encontró el estudiante con ID {id}', 'danger')
+            return redirect(url_for('clientes'))
+        
+        # 3. Obtener pagos ordenados
+        pagos = Pago.query.filter_by(
+            cliente_id=id
+        ).order_by(
+            Pago.fecha_pago.desc()
+        ).all()
+        
+        # 4. Log de éxito
+        app.logger.info(f'✅ Cliente {id} cargado: {cliente.nombre_completo}')
+        
+        # 5. Renderizar template
+        return render_template(
+            'clientes/detalle.html', 
+            cliente=cliente, 
+            pagos=pagos
+        )
+        
     except Exception as e:
-        app.logger.error(f'Error en detalle cliente {id}: {e}')
-        flash('Cliente no encontrado', 'danger')
+        # 6. Manejo de errores detallado
+        app.logger.error(f'❌ Error cargando cliente {id}: {str(e)}')
+        import traceback
+        app.logger.error(traceback.format_exc())
+        
+        flash(f'❌ Error al cargar el estudiante: {str(e)}', 'danger')
         return redirect(url_for('clientes'))
 
 @app.route('/clientes/<int:id>/editar', methods=['GET', 'POST'])
 @requiere_licencia_y_auth
 def cliente_editar(id):
-    """Editar un cliente con validación mejorada"""
     cliente = Cliente.query.get_or_404(id)
     
     if request.method == 'POST':
         try:
-            # ===================================
-            # 1. VALIDAR FORMULARIO
-            # ===================================
-            es_valido, errores = validar_formulario_cliente(request.form, cliente)
-            
-            if not es_valido:
-                for error in errores:
-                    flash(f'❌ {error}', 'danger')
-                return redirect(url_for('cliente_editar', id=id))
-            
-            # ===================================
-            # 2. VALIDAR EMAIL ÚNICO
-            # ===================================
+            # Validar email único
             email = request.form.get('email', '').strip()
             email_existe = Cliente.query.filter(
                 Cliente.email == email,
@@ -1511,14 +1744,11 @@ def cliente_editar(id):
             ).first()
             
             if email_existe:
-                flash(f'❌ Ya existe otro estudiante con el email {email}', 'danger')
+                flash(f'Ya existe otro estudiante con el email {email}', 'danger')
                 return redirect(url_for('cliente_editar', id=id))
             
-            # ===================================
-            # 3. VALIDAR CÉDULA ÚNICA
-            # ===================================
+            # Validar cédula única (si se proporciona)
             cedula = request.form.get('cedula', '').strip()
-            
             if cedula:
                 cedula_existe = Cliente.query.filter(
                     Cliente.cedula == cedula,
@@ -1526,90 +1756,56 @@ def cliente_editar(id):
                 ).first()
                 
                 if cedula_existe:
-                    flash(f'❌ Ya existe otro estudiante con la cédula {cedula}', 'danger')
+                    flash(f'Ya existe otro estudiante con la cédula {cedula}', 'danger')
                     return redirect(url_for('cliente_editar', id=id))
             
-            # ===================================
-            # 4. ACTUALIZAR DATOS
-            # ===================================
+            # Actualizar datos personales
             cliente.nombre = request.form['nombre'].strip()
             cliente.apellido = request.form['apellido'].strip()
             cliente.email = email
-            cliente.cedula = cedula or None  # ✅ Actualizar cédula
+            cliente.cedula = cedula or None
             cliente.telefono = request.form.get('telefono', '').strip() or None
             cliente.direccion = request.form.get('direccion', '').strip() or None
-            
-            # Actualizar curso
-            curso_id_nuevo = request.form.get('curso_id')
-            if curso_id_nuevo and curso_id_nuevo != str(cliente.curso_id):
-                curso = Curso.query.get(curso_id_nuevo)
-                if curso and curso.activo:
-                    cliente.curso_id = curso_id_nuevo
-            
-            # Actualizar plan
-            cliente.plan_id = request.form.get('plan_id') or None
-            
-            # Actualizar fechas
-            fecha_registro_str = request.form.get('fecha_registro')
-            if fecha_registro_str:
-                try:
-                    cliente.fecha_registro = datetime.strptime(fecha_registro_str, '%Y-%m-%d')
-                except:
-                    pass
-            
-            fecha_inicio_clases_str = request.form.get('fecha_inicio_clases')
-            if fecha_inicio_clases_str:
-                try:
-                    cliente.fecha_inicio_clases = datetime.strptime(fecha_inicio_clases_str, '%Y-%m-%d')
-                except:
-                    pass
-            
-            fecha_fin_str = request.form.get('fecha_fin')
-            if fecha_fin_str:
-                try:
-                    cliente.fecha_fin = datetime.strptime(fecha_fin_str, '%Y-%m-%d')
-                except:
-                    pass
-            
-            # Actualizar datos de inscripción
-            valor_inscripcion_str = request.form.get('valor_inscripcion', '').strip()
-            if valor_inscripcion_str:
-                try:
-                    cliente.valor_inscripcion = float(valor_inscripcion_str)
-                except:
-                    pass
-            # ✅ Cobertura y mensualidades se calculan automáticamente desde pagos.
-            # (Evita inconsistencias al editar manualmente.)
-            cliente.observaciones_inscripcion = request.form.get('observaciones_inscripcion', '').strip() or None
-            cliente.notas = request.form.get('notas', '').strip() or None
             cliente.activo = 'activo' in request.form
-            # Recalcular cobertura en caso de cambios de curso/precio o ajustes
-            _recalcular_cobertura_cliente(cliente)
             
+            # Actualizar notas
+            cliente.notas = request.form.get('notas', '').strip() or None
+            cliente.observaciones_inscripcion = request.form.get('observaciones_inscripcion', '').strip() or None
+            
+            # ✅ NO permitir cambio de curso
+            # El curso_id se mantiene igual
+            
+            # Actualizar fecha de inicio si cambió
+            fecha_inicio_str = request.form.get('fecha_inicio_clases')
+            if fecha_inicio_str:
+                nueva_fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d')
+                if cliente.fecha_inicio_clases != nueva_fecha_inicio:
+                    cliente.fecha_inicio_clases = nueva_fecha_inicio
+                    # Recalcular fecha_fin basado en mensualidades_canceladas
+                    mensualidades = int(request.form.get('mensualidades_canceladas', cliente.mensualidades_canceladas))
+                    if mensualidades > 0:
+                        cliente.fecha_fin = nueva_fecha_inicio + timedelta(days=mensualidades * 30)
+                    else:
+                        cliente.fecha_fin = nueva_fecha_inicio
+            
+            # Recalcular cobertura
+            _recalcular_cobertura_cliente(cliente)
             db.session.commit()
             
-            app.logger.info(f'✅ Cliente actualizado: {cliente.nombre_completo} (Cédula: {cliente.cedula or "N/A"})')
             flash(f'✅ Estudiante {cliente.nombre_completo} actualizado exitosamente', 'success')
             return redirect(url_for('cliente_detalle', id=id))
             
         except Exception as e:
             db.session.rollback()
-            app.logger.error(f'❌ Error actualizando cliente {id}: {e}')
-            import traceback
-            app.logger.error(traceback.format_exc())
+            app.logger.error(f'Error actualizando cliente {id}: {e}')
             flash(f'❌ Error al actualizar: {str(e)}', 'danger')
-            return redirect(url_for('cliente_editar', id=id))
     
-    # ===================================
-    # GET: Mostrar formulario
-    # ===================================
     cursos = Curso.query.filter_by(activo=True).all()
-    planes = Plan.query.filter_by(activo=True).all()
-    
     return render_template('clientes/formulario_extended.html', 
                          cliente=cliente, 
                          cursos=cursos, 
-                         planes=planes)
+                         planes=[])
+
 @app.route('/clientes/<int:id>/eliminar', methods=['POST'])
 @requiere_licencia_y_auth  # ✅ CAMBIO AQUÍ
 def cliente_eliminar(id):
@@ -1826,91 +2022,272 @@ def pagos_estudiante_pdf(cliente_id):
 @app.route('/pagos/nuevo/<int:cliente_id>', methods=['GET', 'POST'])
 @requiere_licencia_y_auth
 def pago_nuevo(cliente_id):
-    """Registrar un pago (completo o parcial) con cobertura robusta.
-
-    - Siempre guarda el pago.
-    - Recalcula cobertura recorriendo TODOS los pagos en orden (acumula parciales).
-    - Mantiene coherencia incluso si luego se eliminan pagos.
     """
+    Registrar un pago con sistema de abonos inteligente
+    
+    CARACTERÍSTICAS:
+    ✅ Permite abonos parciales a inscripción
+    ✅ Permite abonos parciales a mensualidades
+    ✅ Acumula pagos hasta completar conceptos
+    ✅ Recalcula cobertura automáticamente
+    ✅ Muestra desglose detallado en tiempo real
+    
+    CONCEPTOS DE PAGO:
+    - 'auto': Distribución automática (primero inscripción, luego mensualidades)
+    - 'inscripcion': Solo para inscripción
+    - 'mensualidad': Solo para mensualidades
+    """
+    
+    
     cliente = Cliente.query.get_or_404(cliente_id)
 
     if request.method == 'POST':
         try:
-            # Validar monto
+            # ===================================
+            # 1. VALIDAR MONTO
+            # ===================================
             monto = float(request.form.get('monto', 0))
             if monto <= 0:
                 flash('❌ El monto debe ser mayor a 0', 'danger')
                 return redirect(url_for('pago_nuevo', cliente_id=cliente_id))
 
-            # Validar que tenga curso
+            # ===================================
+            # 2. VALIDAR QUE TENGA CURSO
+            # ===================================
             if not cliente.curso:
                 flash('❌ El estudiante no tiene curso asignado', 'danger')
                 return redirect(url_for('cliente_detalle', id=cliente_id))
 
             precio_mensual = float(cliente.curso.precio_mensual or 0)
+            precio_inscripcion = float(cliente.curso.precio_inscripcion or 0)
+            
             if precio_mensual <= 0:
                 flash('❌ El curso no tiene un precio mensual válido', 'danger')
                 return redirect(url_for('cliente_detalle', id=cliente_id))
 
-            # Guardar valores anteriores (para mensaje)
-            meses_antes = int(cliente.mensualidades_canceladas or 0)
-            fecha_fin_antes = cliente.fecha_fin
+            # ===================================
+            # 3. OBTENER CONCEPTO DEL PAGO
+            # ===================================
+            concepto = request.form.get('concepto_pago', 'auto').strip()
+            
+            # Validar concepto
+            if concepto not in ['auto', 'inscripcion', 'mensualidad']:
+                concepto = 'auto'
 
-            # Registrar pago SIEMPRE (completo o parcial)
+            # ===================================
+            # 4. CALCULAR QUÉ CUBRE EL PAGO (PREVIEW)
+            # ===================================
+            
+            # Estado ANTES del pago
+            inscripcion_pendiente_antes = cliente.inscripcion_pendiente
+            meses_antes = int(cliente.mensualidades_canceladas or 0)
+            carry_antes = float(cliente.carry_mensualidad or 0)
+            fecha_fin_antes = cliente.fecha_fin
+            
+            # Simular distribución
+            desglose = []
+            saldo = monto
+            
+            # CONCEPTO: AUTOMÁTICO
+            if concepto == 'auto':
+                # ¿Cubre inscripción?
+                if inscripcion_pendiente_antes > 0:
+                    if saldo >= inscripcion_pendiente_antes:
+                        desglose.append({
+                            'tipo': 'inscripcion',
+                            'monto': inscripcion_pendiente_antes,
+                            'completo': True,
+                            'descripcion': f"✅ Inscripción completa: ${inscripcion_pendiente_antes:.2f}"
+                        })
+                        saldo -= inscripcion_pendiente_antes
+                    else:
+                        desglose.append({
+                            'tipo': 'inscripcion',
+                            'monto': saldo,
+                            'completo': False,
+                            'descripcion': f"💰 Abono inscripción: ${saldo:.2f} (falta ${inscripcion_pendiente_antes - saldo:.2f})"
+                        })
+                        saldo = 0
+                
+                # ¿Cubre mensualidades?
+                if saldo > 0:
+                    carry_total = carry_antes + saldo
+                    meses_completos = int(carry_total // precio_mensual)
+                    carry_restante = carry_total % precio_mensual
+                    
+                    if meses_completos > 0:
+                        desglose.append({
+                            'tipo': 'mensualidad',
+                            'monto': meses_completos * precio_mensual,
+                            'completo': True,
+                            'descripcion': f"✅ {meses_completos} mensualidad(es): ${meses_completos * precio_mensual:.2f}"
+                        })
+                    
+                    if carry_restante > 0:
+                        desglose.append({
+                            'tipo': 'carry',
+                            'monto': carry_restante,
+                            'completo': False,
+                            'descripcion': f"💰 Crédito acumulado: ${carry_restante:.2f} (falta ${precio_mensual - carry_restante:.2f})"
+                        })
+            
+            # CONCEPTO: SOLO INSCRIPCIÓN
+            elif concepto == 'inscripcion':
+                if inscripcion_pendiente_antes > 0:
+                    abono = min(saldo, inscripcion_pendiente_antes)
+                    completo = (abono >= inscripcion_pendiente_antes)
+                    
+                    if completo:
+                        desglose.append({
+                            'tipo': 'inscripcion',
+                            'monto': abono,
+                            'completo': True,
+                            'descripcion': f"✅ Inscripción completa: ${abono:.2f}"
+                        })
+                    else:
+                        desglose.append({
+                            'tipo': 'inscripcion',
+                            'monto': abono,
+                            'completo': False,
+                            'descripcion': f"💰 Abono inscripción: ${abono:.2f} (falta ${inscripcion_pendiente_antes - abono:.2f})"
+                        })
+                else:
+                    desglose.append({
+                        'tipo': 'info',
+                        'monto': 0,
+                        'completo': False,
+                        'descripcion': "⚠️ La inscripción ya está pagada"
+                    })
+            
+            # CONCEPTO: SOLO MENSUALIDAD
+            elif concepto == 'mensualidad':
+                carry_total = carry_antes + saldo
+                meses_completos = int(carry_total // precio_mensual)
+                carry_restante = carry_total % precio_mensual
+                
+                if meses_completos > 0:
+                    desglose.append({
+                        'tipo': 'mensualidad',
+                        'monto': meses_completos * precio_mensual,
+                        'completo': True,
+                        'descripcion': f"✅ {meses_completos} mensualidad(es): ${meses_completos * precio_mensual:.2f}"
+                    })
+                
+                if carry_restante > 0:
+                    desglose.append({
+                        'tipo': 'carry',
+                        'monto': carry_restante,
+                        'completo': False,
+                        'descripcion': f"💰 Crédito acumulado: ${carry_restante:.2f} (falta ${precio_mensual - carry_restante:.2f})"
+                    })
+
+            # ===================================
+            # 5. REGISTRAR PAGO
+            # ===================================
             pago = Pago(
                 cliente_id=cliente_id,
                 monto=monto,
+                concepto=concepto,  # ✅ NUEVO CAMPO
                 metodo_pago=(request.form.get('metodo_pago', '') or '').strip() or None,
                 referencia=(request.form.get('referencia', '') or '').strip() or None,
                 notas=(request.form.get('notas', '') or '').strip() or None,
                 periodo=(request.form.get('periodo', '') or '').strip() or datetime.now().strftime('%m/%Y')
             )
             db.session.add(pago)
-            db.session.flush()  # para que ya aparezca en cliente.pagos en el recálculo
+            db.session.flush()
 
-            # Recalcular cobertura de forma robusta
+            # ===================================
+            # 6. RECALCULAR COBERTURA
+            # ===================================
             resultado = _recalcular_cobertura_cliente(cliente)
-
             db.session.commit()
 
-            # Mensajes y feedback al usuario
+            # ===================================
+            # 7. PREPARAR MENSAJE DE CONFIRMACIÓN
+            # ===================================
+            
+            # Estado DESPUÉS del pago
+            inscripcion_completa = resultado.get("inscripcion_completa", False)
             meses_despues = int(cliente.mensualidades_canceladas or 0)
             meses_ganados = max(0, meses_despues - meses_antes)
-
-            carry = float(resultado.get("carry", 0.0) or 0.0)
-            faltante = max(0.0, round(precio_mensual - carry, 2)) if carry > 0 else precio_mensual
-
-            if meses_ganados > 0 and cliente.fecha_fin:
-                mensaje_flash = (
-                    f'✅ Pago de ${monto:.2f} registrado exitosamente\n'
-                    f'📅 Cobertura actualizada: +{meses_ganados} mes(es)\n'
-                    f'🗓️ Nuevo vencimiento: {cliente.fecha_fin.strftime("%d/%m/%Y a las %H:%M")}'
-                )
-            else:
-                # Pago parcial (o no alcanzó nueva mensualidad completa)
-                if carry > 0 and faltante > 0:
-                    mensaje_flash = (
-                        f'✅ Pago de ${monto:.2f} registrado (acumulado)\n'
-                        f'🧾 Crédito acumulado: ${carry:.2f}\n'
-                        f'⚠️ Faltan ${faltante:.2f} para completar 1 mensualidad y obtener 30 días de cobertura.'
-                    )
+            carry_despues = resultado.get("carry", 0)
+            
+            # Construir mensaje
+            mensaje_parts = [f'✅ Pago de ${monto:.2f} registrado exitosamente']
+            
+            # Concepto usado
+            concepto_display = {
+                'auto': 'Automático',
+                'inscripcion': 'Inscripción',
+                'mensualidad': 'Mensualidad'
+            }.get(concepto, concepto)
+            
+            mensaje_parts.append(f"\n📋 Concepto: {concepto_display}")
+            
+            # Agregar desglose
+            if desglose:
+                mensaje_parts.append("\n\n🧾 Distribución:")
+                for item in desglose:
+                    mensaje_parts.append(f"\n   • {item['descripcion']}")
+            
+            # Estado de inscripción
+            if precio_inscripcion > 0:
+                if inscripcion_completa:
+                    mensaje_parts.append("\n\n✅ Inscripción: COMPLETADA")
                 else:
-                    mensaje_flash = f'✅ Pago de ${monto:.2f} registrado exitosamente'
+                    pendiente = resultado.get("inscripcion_pendiente", 0)
+                    porcentaje = cliente.porcentaje_inscripcion
+                    mensaje_parts.append(
+                        f"\n\n⏳ Inscripción: {porcentaje:.0f}% completado "
+                        f"(Pendiente: ${pendiente:.2f})"
+                    )
+            
+            # Cobertura de mensualidades
+            if meses_ganados > 0:
+                mensaje_parts.append(f"\n📅 Cobertura: +{meses_ganados} mes(es)")
+                if cliente.fecha_fin:
+                    mensaje_parts.append(f"\n🗓️ Nuevo vencimiento: {cliente.fecha_fin.strftime('%d/%m/%Y')}")
+            
+            # Carry acumulado
+            if carry_despues > 0:
+                faltante = precio_mensual - carry_despues
+                mensaje_parts.append(f"\n\n💰 Crédito acumulado: ${carry_despues:.2f}")
+                mensaje_parts.append(f"   Faltan ${faltante:.2f} para completar 1 mensualidad")
 
-            # Enviar correo (si está habilitado)
+            mensaje_flash = ''.join(mensaje_parts)
+
+            # ===================================
+            # 8. ENVIAR CORREO (OPCIONAL)
+            # ===================================
             correo_enviado = False
             try:
                 if app.config.get('ENABLE_EMAIL_NOTIFICATIONS', False):
+                    from email_service import enviar_confirmacion_pago
                     correo_enviado = enviar_confirmacion_pago(cliente, pago)
             except Exception as e:
                 app.logger.error(f'❌ Error enviando correo: {e}')
 
             if correo_enviado:
-                mensaje_flash += f'\n✉️ Correo enviado a {cliente.email}'
-            else:
-                mensaje_flash += '\n⚠️ No se envió correo (revisar configuración)'
-
+                mensaje_flash += f'\n\n✉️ Correo enviado a {cliente.email}'
+            
             flash(mensaje_flash, 'success')
+            
+            # Log detallado
+            app.logger.info(f"""
+            💳 PAGO REGISTRADO
+            {'='*60}
+            👤 Estudiante: {cliente.nombre_completo}
+            💵 Monto: ${monto:.2f}
+            📋 Concepto: {concepto_display}
+            🧾 Desglose: {', '.join(d['descripcion'] for d in desglose)}
+            📊 Resultado:
+               - Inscripción: {'✅ Completa' if inscripcion_completa else f'⏳ ${resultado.get("inscripcion_pendiente", 0):.2f} pendiente'}
+               - Mensualidades: {meses_despues} ({'+' + str(meses_ganados) if meses_ganados > 0 else 'sin cambio'})
+               - Carry: ${carry_despues:.2f}
+            🗓️ Vencimiento: {cliente.fecha_fin.strftime('%d/%m/%Y') if cliente.fecha_fin else 'N/A'}
+            {'='*60}
+            """)
+            
             return redirect(url_for('cliente_detalle', id=cliente_id))
 
         except ValueError:
@@ -1924,34 +2301,54 @@ def pago_nuevo(cliente_id):
             flash('❌ Error al registrar el pago', 'danger')
             return redirect(url_for('pago_nuevo', cliente_id=cliente_id))
 
+    # ===================================
+    # GET: MOSTRAR FORMULARIO CON INFO
+    # ===================================
     return render_template('pagos/formulario.html', cliente=cliente, pago=None)
-
 @app.route('/pagos/<int:id>/eliminar', methods=['POST'])
 @requiere_licencia_y_auth
 def pago_eliminar(id):
-    """Eliminar un pago Y recalcular cobertura"""
+    """Eliminar un pago Y recalcular cobertura con sistema de abonos"""
     try:
         pago = Pago.query.get_or_404(id)
         cliente_id = pago.cliente_id
-        cliente = pago.cliente  # Obtener cliente ANTES de eliminar
+        cliente = pago.cliente
         monto = pago.monto
+        
+        # Estado antes de eliminar
+        inscripcion_antes = cliente.abono_inscripcion
+        meses_antes = cliente.mensualidades_canceladas
         
         # Eliminar pago
         db.session.delete(pago)
-        db.session.flush()  # ✅ Flush para que se elimine de cliente.pagos
+        db.session.flush()
         
         # ✅ CRÍTICO: Recalcular cobertura después de eliminar
         resultado = _recalcular_cobertura_cliente(cliente)
         
         db.session.commit()
         
-        app.logger.info(f'💸 Pago eliminado: ${monto:.2f}')
-        app.logger.info(f'📊 Nueva cobertura: {resultado["total_meses"]} meses, carry: ${resultado["carry"]:.2f}')
+        # Estado después
+        inscripcion_despues = resultado.get("abono_inscripcion", 0)
+        meses_despues = resultado.get("total_meses", 0)
+        
+        app.logger.info(f"""
+        🗑️ PAGO ELIMINADO
+        {'='*60}
+        💵 Monto eliminado: ${monto:.2f}
+        📊 Cambios:
+           - Inscripción: ${inscripcion_antes:.2f} → ${inscripcion_despues:.2f}
+           - Mensualidades: {meses_antes} → {meses_despues}
+           - Nuevo vencimiento: {cliente.fecha_fin.strftime('%d/%m/%Y') if cliente.fecha_fin else 'Sin cobertura'}
+        {'='*60}
+        """)
         
         flash(
             f'✅ Pago de ${monto:.2f} eliminado exitosamente\n'
-            f'📊 Cobertura actualizada: {cliente.mensualidades_canceladas} mensualidades\n'
-            f'📅 Nuevo vencimiento: {cliente.fecha_fin.strftime("%d/%m/%Y") if cliente.fecha_fin else "Sin cobertura"}',
+            f'📊 Cobertura actualizada:\n'
+            f'   • Inscripción: ${inscripcion_despues:.2f}\n'
+            f'   • Mensualidades: {meses_despues}\n'
+            f'   • Vencimiento: {cliente.fecha_fin.strftime("%d/%m/%Y") if cliente.fecha_fin else "Sin cobertura"}',
             'success'
         )
         

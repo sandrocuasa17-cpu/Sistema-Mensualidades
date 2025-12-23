@@ -68,8 +68,8 @@
                 <i class="bi bi-calendar-event"></i> {{ ahora.strftime('%A, %d de %B de %Y - %H:%M') }}
             </p>
         </div>
-        <div class="col-md-4 text-end">
-            <button class="btn btn-outline-primary no-print" onclick="location.reload()">
+        <div class="col-md-4 text-end no-print">
+            <button class="btn btn-outline-primary" onclick="location.reload()">
                 <i class="bi bi-arrow-clockwise"></i> Actualizar
             </button>
         </div>
@@ -370,10 +370,19 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <a href="{{ url_for('pago_nuevo', cliente_id=e.id) }}" 
-                                       class="btn btn-sm btn-success">
-                                        <i class="bi bi-credit-card"></i> Pagar
-                                    </a>
+                                    <!-- ✅ BOTÓN CORREGIDO -->
+                                    <div class="btn-group" role="group">
+                                        <a href="{{ url_for('cliente_detalle', id=e.id) }}" 
+                                           class="btn btn-sm btn-outline-primary"
+                                           title="Ver Detalle">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{{ url_for('pago_nuevo', cliente_id=e.id) }}" 
+                                           class="btn btn-sm btn-success"
+                                           title="Registrar Pago">
+                                            <i class="bi bi-credit-card"></i>
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
@@ -404,15 +413,28 @@
                     {% for pago in ultimos_pagos %}
                     <div class="list-group-item">
                         <div class="d-flex justify-content-between align-items-start">
-                            <div>
+                            <div class="flex-grow-1">
                                 <strong>{{ pago.cliente.nombre_completo }}</strong><br>
                                 <small class="text-muted">
-                                    {{ pago.fecha_pago.strftime('%d/%m/%Y %H:%M') }}
+                                    <i class="bi bi-calendar"></i> {{ pago.fecha_pago.strftime('%d/%m/%Y %H:%M') }}
                                 </small>
+                                {% if pago.metodo_pago %}
+                                <br><small class="text-muted">
+                                    <i class="bi bi-credit-card"></i> {{ pago.metodo_pago }}
+                                </small>
+                                {% endif %}
                             </div>
-                            <span class="badge bg-success" style="font-size: 1rem;">
-                                ${{ "%.2f"|format(pago.monto) }}
-                            </span>
+                            <div class="text-end">
+                                <span class="badge bg-success" style="font-size: 1rem;">
+                                    ${{ "%.2f"|format(pago.monto) }}
+                                </span>
+                                <br>
+                                <!-- ✅ BOTÓN VER DETALLE CORREGIDO -->
+                                <a href="{{ url_for('cliente_detalle', id=pago.cliente_id) }}" 
+                                   class="btn btn-sm btn-outline-primary mt-2">
+                                    <i class="bi bi-eye"></i> Ver
+                                </a>
+                            </div>
                         </div>
                     </div>
                     {% endfor %}

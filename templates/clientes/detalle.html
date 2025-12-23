@@ -16,44 +16,147 @@
             <p class="text-muted mb-0">Información completa del estudiante</p>
         </div>
         <div class="btn-group mb-3" role="group">
-    <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" 
-       class="btn btn-success">
-        <i class="bi bi-credit-card"></i> Registrar Pago
-    </a>
-    <a href="{{ url_for('pagos_estudiante_pdf', cliente_id=cliente.id) }}" 
-       class="btn btn-danger"
-       target="_blank">
-        <i class="bi bi-file-pdf"></i> Descargar PDF
-    </a>
-    <a href="{{ url_for('cliente_editar', id=cliente.id) }}" 
-       class="btn btn-warning">
-        <i class="bi bi-pencil"></i> Editar
-    </a>
-    <a href="{{ url_for('clientes') }}" 
-       class="btn btn-secondary">
-        <i class="bi bi-arrow-left"></i> Volver
-    </a>
-</div>
+            <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" 
+               class="btn btn-success">
+                <i class="bi bi-credit-card"></i> Registrar Pago
+            </a>
+            <a href="{{ url_for('pagos_estudiante_pdf', cliente_id=cliente.id) }}" 
+               class="btn btn-danger"
+               target="_blank">
+                <i class="bi bi-file-pdf"></i> Descargar PDF
+            </a>
+            <a href="{{ url_for('cliente_editar', id=cliente.id) }}" 
+               class="btn btn-warning">
+                <i class="bi bi-pencil"></i> Editar
+            </a>
+            <a href="{{ url_for('clientes') }}" 
+               class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Volver
+            </a>
+        </div>
     </div>
 </div>
 
-<!-- Alerta de Estado -->
+<!-- ✅ TARJETA DE INSCRIPCIÓN CON SISTEMA DE TRACKING -->
+{% if cliente.curso and cliente.curso.precio_inscripcion > 0 %}
+<div class="card mb-4 shadow-lg" style="border: 3px solid {% if cliente.inscripcion_pagada %}#10b981{% else %}#f59e0b{% endif %}; border-radius: 15px; overflow: hidden;">
+    <div class="card-header" style="background: {% if cliente.inscripcion_pagada %}linear-gradient(135deg, #10b981 0%, #059669 100%){% else %}linear-gradient(135deg, #f59e0b 0%, #d97706 100%){% endif %}; color: white; padding: 20px;">
+        <div class="d-flex justify-content-between align-items-center">
+            <h4 class="mb-0 fw-bold">
+                <i class="bi bi-{% if cliente.inscripcion_pagada %}check-circle-fill{% else %}hourglass-split{% endif %}"></i> 
+                Estado de Inscripción
+            </h4>
+            {% if cliente.inscripcion_pagada %}
+                <span class="badge bg-white text-success" style="font-size: 14px; padding: 10px 15px;">
+                    <i class="bi bi-check-circle-fill"></i> COMPLETADA
+                </span>
+            {% else %}
+                <span class="badge bg-white text-warning" style="font-size: 14px; padding: 10px 15px;">
+                    <i class="bi bi-hourglass-split"></i> PENDIENTE
+                </span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body" style="padding: 30px;">
+        <div class="row align-items-center">
+            <!-- Icono de Estado -->
+            <div class="col-md-3 text-center mb-3 mb-md-0">
+                <div style="width: 140px; height: 140px; margin: 0 auto; border-radius: 50%; background: {% if cliente.inscripcion_pagada %}linear-gradient(135deg, #10b981 0%, #059669 100%){% else %}linear-gradient(135deg, #f59e0b 0%, #d97706 100%){% endif %}; display: flex; align-items: center; justify-content: center; color: white; font-size: 64px; box-shadow: 0 8px 20px rgba(0,0,0,0.15);">
+                    <i class="bi bi-{% if cliente.inscripcion_pagada %}check-circle-fill{% else %}hourglass-split{% endif %}"></i>
+                </div>
+            </div>
+            
+            <!-- Información Detallada -->
+            <div class="col-md-9">
+                {% if cliente.inscripcion_pagada %}
+                    <!-- INSCRIPCIÓN COMPLETADA -->
+                    <h3 class="text-success mb-3">
+                        <i class="bi bi-check-circle-fill"></i> Inscripción Completada
+                    </h3>
+                    <p class="lead mb-3">
+                        El estudiante ha pagado completamente su inscripción de 
+                        <strong class="text-success">${{ "%.2f"|format(cliente.curso.precio_inscripcion) }}</strong>
+                    </p>
+                    <div class="progress mb-2" style="height: 30px; border-radius: 15px; background: #e5e7eb;">
+                        <div class="progress-bar bg-success" 
+                             role="progressbar" 
+                             style="width: 100%; font-size: 16px; font-weight: bold; border-radius: 15px;"
+                             aria-valuenow="100" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            <i class="bi bi-check-circle-fill"></i> 100% Completado
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-success fw-bold">
+                            <i class="bi bi-cash-coin"></i> Pagado: ${{ "%.2f"|format(cliente.abono_inscripcion) }}
+                        </small>
+                        <small class="text-muted">
+                            <i class="bi bi-calendar-check"></i> Total: ${{ "%.2f"|format(cliente.curso.precio_inscripcion) }}
+                        </small>
+                    </div>
+                {% else %}
+                    <!-- INSCRIPCIÓN PENDIENTE -->
+                    <h3 class="text-warning mb-3">
+                        <i class="bi bi-exclamation-triangle-fill"></i> Inscripción Pendiente
+                    </h3>
+                    <p class="lead mb-3">
+                        Falta abonar 
+                        <strong class="text-danger">${{ "%.2f"|format(cliente.inscripcion_pendiente) }}</strong> 
+                        de ${{ "%.2f"|format(cliente.curso.precio_inscripcion) }}
+                    </p>
+                    <div class="progress mb-2" style="height: 30px; border-radius: 15px; background: #e5e7eb;">
+                        {% set porcentaje = ((cliente.abono_inscripcion / cliente.curso.precio_inscripcion) * 100) if cliente.curso.precio_inscripcion > 0 else 0 %}
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning" 
+                             role="progressbar" 
+                             style="width: {{ "%.0f"|format(porcentaje) }}%; font-size: 16px; font-weight: bold; border-radius: 15px;"
+                             aria-valuenow="{{ porcentaje }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            {{ "%.0f"|format(porcentaje) }}% - ${{ "%.2f"|format(cliente.abono_inscripcion) }} pagado
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">
+                            <i class="bi bi-cash-coin"></i> Abonado: ${{ "%.2f"|format(cliente.abono_inscripcion) }}
+                        </small>
+                        <small class="text-danger fw-bold">
+                            <i class="bi bi-exclamation-circle"></i> Pendiente: ${{ "%.2f"|format(cliente.inscripcion_pendiente) }}
+                        </small>
+                    </div>
+                    
+                    <!-- Botón de Pago Rápido -->
+                    <div class="mt-3">
+                        <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" 
+                           class="btn btn-warning btn-lg w-100">
+                            <i class="bi bi-credit-card-fill"></i> 
+                            Abonar a Inscripción (${{ "%.2f"|format(cliente.inscripcion_pendiente) }})
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Alerta de Vencimiento -->
 {% if cliente.plan_vencido %}
-<div class="alert alert-danger" style="border-left: 5px solid #dc3545;">
+<div class="alert alert-danger shadow-sm" style="border-left: 5px solid #dc3545; border-radius: 10px;">
     <div class="d-flex align-items-center">
-        <i class="bi bi-exclamation-triangle-fill me-3" style="font-size: 36px;"></i>
+        <i class="bi bi-exclamation-triangle-fill me-3" style="font-size: 48px;"></i>
         <div>
-            <h5 class="alert-heading mb-1">⚠️ Plan Vencido</h5>
+            <h5 class="alert-heading mb-1 fw-bold">⚠️ Mensualidad Vencida</h5>
             <p class="mb-0">Este estudiante necesita renovar su mensualidad urgentemente.</p>
         </div>
     </div>
 </div>
-{% elif cliente.dias_restantes is not none and cliente.dias_restantes <= 7 %}
-<div class="alert alert-warning" style="border-left: 5px solid #ffc107;">
+{% elif cliente.dias_restantes is not none and cliente.dias_restantes <= 7 and cliente.ha_iniciado_clases %}
+<div class="alert alert-warning shadow-sm" style="border-left: 5px solid #ffc107; border-radius: 10px;">
     <div class="d-flex align-items-center">
-        <i class="bi bi-clock-history me-3" style="font-size: 36px;"></i>
+        <i class="bi bi-clock-history me-3" style="font-size: 48px;"></i>
         <div>
-            <h5 class="alert-heading mb-1">⏰ Plan Próximo a Vencer</h5>
+            <h5 class="alert-heading mb-1 fw-bold">⏰ Próximo a Vencer</h5>
             <p class="mb-0">
                 Quedan <strong>{{ cliente.dias_restantes }} día{{ 's' if cliente.dias_restantes != 1 else '' }}</strong> 
                 hasta el vencimiento ({{ cliente.fecha_fin.strftime('%d/%m/%Y') }})
@@ -64,11 +167,11 @@
 {% endif %}
 
 <div class="row">
-    <!-- COLUMNA IZQUIERDA: Información Personal y Académica -->
+    <!-- COLUMNA IZQUIERDA: Información Personal -->
     <div class="col-lg-4 mb-4">
         <!-- Datos Personales -->
-        <div class="card mb-3" style="border-left: 5px solid #667eea;">
-            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <div class="card mb-3 shadow-sm" style="border-left: 5px solid #667eea; border-radius: 10px;">
+            <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px 10px 0 0;">
                 <h5 class="mb-0">
                     <i class="bi bi-person-vcard"></i> Datos Personales
                 </h5>
@@ -76,26 +179,45 @@
             <div class="card-body">
                 <div class="mb-3">
                     <h6 class="text-muted mb-1">
-                        <i class="bi bi-person"></i> Nombre Completo
+                        <i class="bi bi-person-fill"></i> Nombre Completo
                     </h6>
-                    <p class="fw-bold mb-0">{{ cliente.nombre_completo }}</p>
+                    <p class="fw-bold mb-0 fs-5">{{ cliente.nombre_completo }}</p>
                 </div>
-                <div class="row">
-                    <div class="col-md-6">
-                        <p><strong>📧 Email:</strong> {{ cliente.email }}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <p><strong>🆔 Cédula:</strong> {{ cliente.cedula or 'No registrada' }}</p>
-                    </div>
+                
+                <div class="mb-3">
+                    <h6 class="text-muted mb-1">
+                        <i class="bi bi-envelope-fill"></i> Email
+                    </h6>
+                    <p class="mb-0">
+                        <a href="mailto:{{ cliente.email }}" class="text-decoration-none">
+                            {{ cliente.email }}
+                        </a>
+                    </p>
                 </div>
+                
+                <div class="mb-3">
+                    <h6 class="text-muted mb-1">
+                        <i class="bi bi-card-text"></i> Cédula/DNI
+                    </h6>
+                    <p class="mb-0">
+                        {% if cliente.cedula %}
+                            <span class="badge bg-secondary" style="font-size: 13px; font-family: monospace;">
+                                {{ cliente.cedula }}
+                            </span>
+                        {% else %}
+                            <span class="text-muted">No registrada</span>
+                        {% endif %}
+                    </p>
+                </div>
+
                 {% if cliente.telefono %}
                 <div class="mb-3">
                     <h6 class="text-muted mb-1">
-                        <i class="bi bi-phone"></i> Teléfono
+                        <i class="bi bi-phone-fill"></i> Teléfono
                     </h6>
                     <p class="mb-0">
                         <a href="tel:{{ cliente.telefono }}" class="text-decoration-none">
-                            {{ cliente.telefono }}
+                            <i class="bi bi-telephone"></i> {{ cliente.telefono }}
                         </a>
                     </p>
                 </div>
@@ -104,7 +226,7 @@
                 {% if cliente.direccion %}
                 <div class="mb-3">
                     <h6 class="text-muted mb-1">
-                        <i class="bi bi-geo-alt"></i> Dirección
+                        <i class="bi bi-geo-alt-fill"></i> Dirección
                     </h6>
                     <p class="mb-0">{{ cliente.direccion }}</p>
                 </div>
@@ -116,12 +238,12 @@
                     </h6>
                     <p class="mb-0">
                         {% if cliente.activo %}
-                            <span class="badge bg-success" style="font-size: 14px;">
-                                <i class="bi bi-check-circle"></i> Activo
+                            <span class="badge bg-success" style="font-size: 14px; padding: 8px 12px;">
+                                <i class="bi bi-check-circle-fill"></i> Activo
                             </span>
                         {% else %}
-                            <span class="badge bg-secondary" style="font-size: 14px;">
-                                <i class="bi bi-x-circle"></i> Inactivo
+                            <span class="badge bg-secondary" style="font-size: 14px; padding: 8px 12px;">
+                                <i class="bi bi-x-circle-fill"></i> Inactivo
                             </span>
                         {% endif %}
                     </p>
@@ -129,11 +251,11 @@
             </div>
         </div>
 
-        <!-- Datos de Inscripción -->
-        <div class="card" style="border-left: 5px solid #28a745;">
-            <div class="card-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+        <!-- Datos de Inscripción Académica -->
+        <div class="card shadow-sm" style="border-left: 5px solid #28a745; border-radius: 10px;">
+            <div class="card-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border-radius: 10px 10px 0 0;">
                 <h5 class="mb-0">
-                    <i class="bi bi-calendar-check"></i> Inscripción
+                    <i class="bi bi-calendar-check"></i> Información Académica
                 </h5>
             </div>
             <div class="card-body">
@@ -141,7 +263,7 @@
                     <h6 class="text-muted mb-1">
                         <i class="bi bi-calendar-event"></i> Fecha de Registro
                     </h6>
-                    <p class="mb-0">
+                    <p class="mb-0 fw-bold">
                         {{ cliente.fecha_registro.strftime('%d/%m/%Y') if cliente.fecha_registro else 'N/A' }}
                     </p>
                 </div>
@@ -150,29 +272,18 @@
                     <h6 class="text-muted mb-1">
                         <i class="bi bi-calendar-plus"></i> Inicio de Clases
                     </h6>
-                    <p class="mb-0">
+                    <p class="mb-0 fw-bold">
                         {{ cliente.fecha_inicio_clases.strftime('%d/%m/%Y') if cliente.fecha_inicio_clases else 'N/A' }}
                     </p>
                 </div>
 
                 <div class="mb-3">
                     <h6 class="text-muted mb-1">
-                        <i class="bi bi-cash-coin"></i> Valor Inscripción
+                        <i class="bi bi-check2-circle"></i> Mensualidades Pagadas
                     </h6>
                     <p class="mb-0">
-                        <span class="badge bg-info" style="font-size: 14px;">
-                            ${{ "%.2f"|format(cliente.valor_inscripcion) }}
-                        </span>
-                    </p>
-                </div>
-
-                <div class="mb-3">
-                    <h6 class="text-muted mb-1">
-                        <i class="bi bi-check2-circle"></i> Mensualidades Canceladas
-                    </h6>
-                    <p class="mb-0">
-                        <span class="badge bg-primary" style="font-size: 14px;">
-                            {{ cliente.mensualidades_canceladas }}
+                        <span class="badge bg-primary" style="font-size: 16px; padding: 10px 15px;">
+                            {{ cliente.mensualidades_canceladas }} mes{{ 'es' if cliente.mensualidades_canceladas != 1 else '' }}
                         </span>
                     </p>
                 </div>
@@ -182,82 +293,90 @@
                     <h6 class="text-muted mb-1">
                         <i class="bi bi-chat-left-text"></i> Observaciones
                     </h6>
-                    <p class="small mb-0" style="white-space: pre-wrap;">{{ cliente.observaciones_inscripcion }}</p>
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <p class="small mb-0" style="white-space: pre-wrap;">{{ cliente.observaciones_inscripcion }}</p>
+                        </div>
+                    </div>
                 </div>
                 {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- COLUMNA DERECHA: Curso, Estado de Cuenta y Pagos -->
+    <!-- COLUMNA DERECHA: Curso y Pagos -->
     <div class="col-lg-8 mb-4">
         <!-- Curso Actual -->
-        <div class="card mb-4" style="border: 3px solid #38ef7d; box-shadow: 0 4px 15px rgba(56, 239, 125, 0.2);">
-            <div class="card-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
-                <h5 class="mb-0">
+        <div class="card mb-4 shadow-lg" style="border: 3px solid #38ef7d; border-radius: 15px;">
+            <div class="card-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; padding: 20px; border-radius: 15px 15px 0 0;">
+                <h4 class="mb-0 fw-bold">
                     <i class="bi bi-book-fill"></i> Curso Inscrito
-                </h5>
+                </h4>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="padding: 30px;">
                 {% if cliente.curso %}
-                <div class="row align-items-center mb-3">
+                <div class="row align-items-center mb-4">
                     <div class="col-md-6">
-                        <h3 class="text-primary mb-2">{{ cliente.curso.nombre }}</h3>
+                        <h2 class="text-primary mb-2 fw-bold">{{ cliente.curso.nombre }}</h2>
                         {% if cliente.curso.descripcion %}
-                        <p class="text-muted small mb-0">{{ cliente.curso.descripcion }}</p>
+                        <p class="text-muted mb-0">{{ cliente.curso.descripcion }}</p>
                         {% endif %}
                     </div>
                     <div class="col-md-3 text-center">
                         <h6 class="text-muted mb-1">Mensualidad</h6>
-                        <h2 class="text-success mb-0">
+                        <h1 class="text-success mb-0 fw-bold">
                             ${{ "%.2f"|format(cliente.curso.precio_mensual) }}
-                        </h2>
+                        </h1>
+                        <small class="text-muted">/mes</small>
                     </div>
                     <div class="col-md-3 text-center">
                         <h6 class="text-muted mb-1">Duración</h6>
-                        <h2 class="text-info mb-0">
-                            {{ cliente.curso.duracion_meses }} <small>meses</small>
-                        </h2>
+                        <h1 class="text-info mb-0">
+                            <i class="bi bi-infinity"></i>
+                        </h1>
+                        <small class="text-muted">Indefinido</small>
                     </div>
                 </div>
                 
-                <!-- ✅ Información de Vencimiento (CORREGIDA) -->
+                <!-- Información de Vencimiento -->
                 {% if cliente.fecha_fin %}
-                <div class="card bg-light">
-                    <div class="card-body">
+                <div class="card" style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%); border: 2px solid #d1d5db; border-radius: 10px;">
+                    <div class="card-body" style="padding: 25px;">
                         <div class="row align-items-center">
                             <div class="col-md-6">
-                                <h6 class="text-muted mb-1">
+                                <h6 class="text-muted mb-2">
                                     <i class="bi bi-calendar-x"></i> Próximo Vencimiento
                                 </h6>
-                                <h4 class="mb-0">{{ cliente.fecha_fin.strftime('%d/%m/%Y') }}</h4>
+                                <h3 class="mb-0 fw-bold text-dark">
+                                    {{ cliente.fecha_fin.strftime('%d/%m/%Y') }}
+                                </h3>
                             </div>
                             <div class="col-md-6 text-end">
                                 {% if cliente.dias_restantes is not none %}
                                     {% if cliente.estado_pago == 'pendiente-inicio' %}
-                                        <span class="badge bg-info text-dark" style="font-size: 16px; padding: 12px 20px;">
+                                        <span class="badge" style="font-size: 18px; padding: 15px 25px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border: none;">
                                             <i class="bi bi-calendar-plus"></i> Inicia en {{ cliente.dias_para_inicio }} día{{ 's' if cliente.dias_para_inicio != 1 else '' }}
                                         </span>
                                         <div class="mt-2">
                                             <small class="text-muted">
-                                                Cobertura pagada: <strong>{{ cliente.dias_restantes }}</strong> día{{ 's' if cliente.dias_restantes != 1 else '' }} (se empieza a contar desde el inicio de clases)
+                                                <i class="bi bi-info-circle"></i> Cobertura: <strong>{{ cliente.dias_restantes }}</strong> día{{ 's' if cliente.dias_restantes != 1 else '' }}
                                             </small>
                                         </div>
                                     {% elif cliente.dias_restantes > 7 %}
-                                        <span class="badge bg-success" style="font-size: 18px; padding: 12px 20px;">
-                                            <i class="bi bi-check-circle"></i> {{ cliente.dias_restantes }} días restantes
+                                        <span class="badge bg-success" style="font-size: 20px; padding: 15px 25px;">
+                                            <i class="bi bi-check-circle-fill"></i> {{ cliente.dias_restantes }} días
                                         </span>
                                     {% elif cliente.dias_restantes > 3 %}
-                                        <span class="badge bg-warning text-dark" style="font-size: 18px; padding: 12px 20px;">
-                                            <i class="bi bi-clock"></i> {{ cliente.dias_restantes }} días restantes
+                                        <span class="badge bg-warning text-dark" style="font-size: 20px; padding: 15px 25px;">
+                                            <i class="bi bi-clock-fill"></i> {{ cliente.dias_restantes }} días
                                         </span>
                                     {% elif cliente.dias_restantes > 0 %}
-                                        <span class="badge bg-danger" style="font-size: 18px; padding: 12px 20px;">
-                                            <i class="bi bi-exclamation-triangle"></i> {{ cliente.dias_restantes }} días restantes
+                                        <span class="badge bg-danger" style="font-size: 20px; padding: 15px 25px;">
+                                            <i class="bi bi-exclamation-triangle-fill"></i> {{ cliente.dias_restantes }} días
                                         </span>
                                     {% else %}
-                                        <span class="badge bg-dark" style="font-size: 18px; padding: 12px 20px;">
-                                            <i class="bi bi-x-circle"></i> VENCIDO
+                                        <span class="badge bg-dark" style="font-size: 20px; padding: 15px 25px;">
+                                            <i class="bi bi-x-circle-fill"></i> VENCIDO
                                         </span>
                                     {% endif %}
                                 {% endif %}
@@ -267,240 +386,257 @@
                 </div>
                 {% endif %}
                 {% else %}
-                <div class="text-center py-4">
-                    <i class="bi bi-exclamation-circle" style="font-size: 48px; color: #ccc;"></i>
-                    <p class="text-muted mt-2">No tiene curso asignado</p>
-                    <a href="{{ url_for('cliente_editar', id=cliente.id) }}" class="btn btn-primary">
-                        <i class="bi bi-book"></i> Asignar Curso
+                <div class="text-center py-5">
+                    <i class="bi bi-exclamation-circle" style="font-size: 80px; color: #ccc;"></i>
+                    <h4 class="mt-3 text-muted">No tiene curso asignado</h4>
+                    <p class="text-muted">Asigna un curso para comenzar</p>
+                    <a href="{{ url_for('cliente_editar', id=cliente.id) }}" class="btn btn-primary btn-lg mt-3">
+                        <i class="bi bi-book-fill"></i> Asignar Curso
                     </a>
                 </div>
                 {% endif %}
             </div>
         </div>
 
-      <!-- ✅ ESTADO DE CUENTA MEJORADO -->
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0">
-            <i class="bi bi-graph-up"></i> Estado de Cuenta
-        </h5>
-    </div>
-    <div class="card-body">
-        <div class="row text-center">
+        <!-- Estado de Cuenta -->
+        <div class="card mb-4 shadow-sm" style="border-radius: 10px;">
+            <div class="card-header bg-white border-bottom">
+                <h5 class="mb-0 fw-bold">
+                    <i class="bi bi-graph-up-arrow"></i> Estado de Cuenta
+                </h5>
+            </div>
+            <div class="card-body" style="padding: 25px;">
+                <div class="row text-center g-3">
+                    
+                    <!-- TARJETA 1: ESTADO ACTUAL -->
+<div class="col-md-4 mb-3">
+    {% set estado_info = {
+        'sin-cobertura': {
+            'color': '#667eea 0%, #764ba2 100%',
+            'icono': 'exclamation-circle-fill',
+            'titulo': 'Sin Cobertura',
+            'descripcion': 'Sin pagos registrados'
+        },
+        'pendiente-inicio': {
+            'color': '#4facfe 0%, #00f2fe 100%',
+            'icono': 'calendar-plus',
+            'titulo': 'Pendiente Inicio',
+            'descripcion': 'Clases aún no comienzan'
+        },
+        'vencido': {
+            'color': '#fa709a 0%, #fee140 100%',
+            'icono': 'x-circle-fill',
+            'titulo': 'Vencido',
+            'descripcion': 'Renovación urgente'
+        },
+        'por-vencer': {
+            'color': '#f093fb 0%, #f5576c 100%',
+            'icono': 'clock-fill',
+            'titulo': 'Próximo a Vencer',
+            'descripcion': '≤7 días restantes'
+        },
+        'al-dia': {
+            'color': '#11998e 0%, #38ef7d 100%',
+            'icono': 'check-circle-fill',
+            'titulo': 'Al Día',
+            'descripcion': 'Pago vigente'
+        }
+    } %}
+    
+    {% set estado_actual = cliente.estado_pago %}
+    {% set info = estado_info.get(estado_actual, estado_info['sin-cobertura']) %}
+    
+    <div class="card h-100 shadow-sm" style="background: linear-gradient(135deg, {{ info.color }}); color: white; border-radius: 15px; border: none;">
+        <div class="card-body" style="padding: 25px;">
+            <i class="bi bi-{{ info.icono }}" style="font-size: 56px; opacity: 0.95;"></i>
+            <h6 class="mt-3 mb-1 fw-bold" style="opacity: 0.9;">Estado Actual</h6>
+            <h3 class="mb-1 fw-bold">{{ info.titulo }}</h3>
+            <small style="opacity: 0.85;">{{ info.descripcion }}</small>
             
-            <!-- ========================================== -->
-            <!-- TARJETA 1: ESTADO ACTUAL (MEJORADO) -->
-            <!-- ========================================== -->
-            <div class="col-md-4 mb-3">
-                {% set estado_info = {
-                    'sin-cobertura': {
-                        'color': '#667eea 0%, #764ba2 100%',
-                        'icono': 'exclamation-circle',
-                        'titulo': 'Sin Cobertura',
-                        'descripcion': 'Sin pagos registrados'
-                    },
-                    'pendiente-inicio': {
-                        'color': '#4facfe 0%, #00f2fe 100%',
-                        'icono': 'calendar-plus',
-                        'titulo': 'Pendiente Inicio',
-                        'descripcion': 'Clases aún no comienzan'
-                    },
-                    'vencido': {
-                        'color': '#fa709a 0%, #fee140 100%',
-                        'icono': 'x-circle',
-                        'titulo': 'Vencido',
-                        'descripcion': 'Requiere renovación urgente'
-                    },
-                    'por-vencer': {
-                        'color': '#f093fb 0%, #f5576c 100%',
-                        'icono': 'clock',
-                        'titulo': 'Próximo a Vencer',
-                        'descripcion': '7 días o menos'
-                    },
-                    'al-dia': {
-                        'color': '#11998e 0%, #38ef7d 100%',
-                        'icono': 'check-circle',
-                        'titulo': 'Al Día',
-                        'descripcion': 'Pago vigente'
-                    }
-                } %}
-                
-                {% set estado_actual = cliente.estado_pago %}
-                {% set info = estado_info.get(estado_actual, estado_info['sin-cobertura']) %}
-                
-                <div class="card h-100" style="background: linear-gradient(135deg, {{ info.color }}); color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                    <div class="card-body">
-                        <i class="bi bi-{{ info.icono }}" style="font-size: 48px; opacity: 0.9;"></i>
-                        <h6 class="mt-3 mb-1">Estado Actual</h6>
-                        <h4 class="mb-1 fw-bold">{{ info.titulo }}</h4>
-                        <small style="opacity: 0.9;">{{ info.descripcion }}</small>
-                        
-                        <!-- ✅ INFORMACIÓN ADICIONAL DINÁMICA -->
-                        {% if estado_actual == 'pendiente-inicio' and cliente.dias_para_inicio is not none %}
-                            <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.3);">
-                                <small class="fw-bold">Inicia en {{ cliente.dias_para_inicio }} día{{ 's' if cliente.dias_para_inicio != 1 else '' }}</small>
-                            </div>
-                        {% elif estado_actual == 'vencido' and cliente.dias_restantes is not none %}
-                            <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.3);">
-                                <small class="fw-bold">Vencido hace {{ abs(cliente.dias_restantes) }} día{{ 's' if abs(cliente.dias_restantes) != 1 else '' }}</small>
-                            </div>
-                        {% elif estado_actual == 'por-vencer' and cliente.dias_restantes is not none %}
-                            <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.3);">
-                                <small class="fw-bold">{{ cliente.dias_restantes }} día{{ 's' if cliente.dias_restantes != 1 else '' }} restantes</small>
-                            </div>
-                        {% elif estado_actual == 'al-dia' and cliente.dias_restantes is not none %}
-                            <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.3);">
-                                <small class="fw-bold">{{ cliente.dias_restantes }} día{{ 's' if cliente.dias_restantes != 1 else '' }} de cobertura</small>
-                            </div>
-                        {% endif %}
-                    </div>
+            {% if estado_actual == 'pendiente-inicio' and cliente.dias_para_inicio is not none %}
+                <div class="mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,0.3);">
+                    <small class="fw-bold">
+                        <i class="bi bi-calendar-event"></i> En {{ cliente.dias_para_inicio }} día{{ 's' if cliente.dias_para_inicio != 1 else '' }}
+                    </small>
                 </div>
-            </div>
-
-            <!-- ========================================== -->
-            <!-- TARJETA 2: SALDO PENDIENTE -->
-            <!-- ========================================== -->
-            <div class="col-md-4 mb-3">
-                <div class="card h-100" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                    <div class="card-body">
-                        <i class="bi bi-cash-stack" style="font-size: 48px; opacity: 0.9;"></i>
-                        <h6 class="mt-3 mb-1">Saldo Pendiente</h6>
-                        <h3 class="mb-1 fw-bold">${{ "%.2f"|format(cliente.saldo_pendiente) }}</h3>
-                        
-                        <!-- ✅ DESGLOSE DEL SALDO -->
-                        {% if cliente.saldo_pendiente > 0 %}
-                        <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.3);">
-                            <small>
-                                Total: ${{ "%.2f"|format(cliente.total_programa) }}<br>
-                                Pagado: ${{ "%.2f"|format(cliente.total_pagado) }}
-                            </small>
-                        </div>
-                        {% else %}
-                        <div class="mt-2">
-                            <small class="fw-bold">✅ Programa completado</small>
-                        </div>
-                        {% endif %}
-                    </div>
+            {% elif estado_actual == 'vencido' and cliente.dias_restantes is not none %}
+                <div class="mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,0.3);">
+                    <small class="fw-bold">
+                        <i class="bi bi-exclamation-triangle"></i> Hace {{ abs(cliente.dias_restantes) }} día{{ 's' if abs(cliente.dias_restantes) != 1 else '' }}
+                    </small>
                 </div>
-            </div>
-
-            <!-- ========================================== -->
-            <!-- TARJETA 3: TOTAL PAGADO -->
-            <!-- ========================================== -->
-            <div class="col-md-4 mb-3">
-                <div class="card h-100" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; box-shadow: 0 4px 15px rgba(0,0,0,0.2);">
-                    <div class="card-body">
-                        <i class="bi bi-currency-dollar" style="font-size: 48px; opacity: 0.9;"></i>
-                        <h6 class="mt-3 mb-1">Total Pagado</h6>
-                        <h3 class="mb-1 fw-bold">${{ "%.2f"|format(cliente.total_pagado) }}</h3>
-                        
-                        <!-- ✅ CANTIDAD DE PAGOS -->
-                        <div class="mt-2 pt-2" style="border-top: 1px solid rgba(255,255,255,0.3);">
-                            <small>
-                                {% if pagos %}
-                                    {{ pagos|length }} pago{{ 's' if pagos|length != 1 else '' }} registrado{{ 's' if pagos|length != 1 else '' }}
-                                {% else %}
-                                    Sin pagos aún
-                                {% endif %}
-                            </small>
-                        </div>
-                        
-                        <!-- ✅ MENSUALIDADES PAGADAS -->
-                        {% if cliente.mensualidades_canceladas > 0 %}
-                        <div class="mt-1">
-                            <small class="fw-bold">
-                                {{ cliente.mensualidades_canceladas }} mensualidad{{ 'es' if cliente.mensualidades_canceladas != 1 else '' }} pagada{{ 's' if cliente.mensualidades_canceladas != 1 else '' }}
-                            </small>
-                        </div>
-                        {% endif %}
-                    </div>
+            {% elif estado_actual in ['por-vencer', 'al-dia'] and cliente.dias_restantes is not none %}
+                <div class="mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,0.3);">
+                    <small class="fw-bold">
+                        <i class="bi bi-clock"></i> {{ cliente.dias_restantes }} día{{ 's' if cliente.dias_restantes != 1 else '' }}
+                    </small>
                 </div>
-            </div>
-            
+            {% endif %}
         </div>
-        
-        <!-- ✅ BARRA DE PROGRESO DEL PROGRAMA -->
-        {% if cliente.total_programa > 0 %}
-        <div class="mt-3">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <small class="text-muted fw-bold">Progreso del Programa</small>
-                <small class="text-muted">
-                    {{ "%.0f"|format((cliente.total_pagado / cliente.total_programa) * 100) }}% completado
-                </small>
-            </div>
-            <div class="progress" style="height: 25px;">
-                <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                     role="progressbar" 
-                     style="width: {{ "%.0f"|format((cliente.total_pagado / cliente.total_programa) * 100) }}%; 
-                            background: linear-gradient(90deg, #11998e 0%, #38ef7d 100%);"
-                     aria-valuenow="{{ (cliente.total_pagado / cliente.total_programa) * 100 }}" 
-                     aria-valuemin="0" 
-                     aria-valuemax="100">
-                    <strong>${{ "%.2f"|format(cliente.total_pagado) }} / ${{ "%.2f"|format(cliente.total_programa) }}</strong>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        
     </div>
 </div>
+
+<!-- TARJETA 2: MENSUALIDADES PAGADAS -->
+<div class="col-md-4 mb-3">
+    <div class="card h-100 shadow-sm" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border-radius: 15px; border: none;">
+        <div class="card-body" style="padding: 25px;">
+            <i class="bi bi-calendar-check" style="font-size: 56px; opacity: 0.95;"></i>
+            <h6 class="mt-3 mb-1 fw-bold" style="opacity: 0.9;">Mensualidades</h6>
+            <h2 class="mb-1 fw-bold">{{ cliente.mensualidades_canceladas }}</h2>
+            
+            <div class="mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,0.3);">
+                <small style="opacity: 0.9;">
+                    Meses pagados
+                </small>
+            </div>
+            
+            {% if cliente.carry_mensualidad > 0 %}
+            <div class="mt-2">
+                <small class="fw-bold">
+                    💰 Crédito: ${{ "%.2f"|format(cliente.carry_mensualidad) }}
+                </small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- TARJETA 3: TOTAL PAGADO -->
+<div class="col-md-4 mb-3">
+    <div class="card h-100 shadow-sm" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; border-radius: 15px; border: none;">
+        <div class="card-body" style="padding: 25px;">
+            <i class="bi bi-currency-dollar" style="font-size: 56px; opacity: 0.95;"></i>
+            <h6 class="mt-3 mb-1 fw-bold" style="opacity: 0.9;">Total Pagado</h6>
+            <h2 class="mb-1 fw-bold">${{ "%.2f"|format(cliente.total_pagado) }}</h2>
+            
+            <div class="mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,0.3);">
+                <small style="opacity: 0.9;">
+                    {% if pagos %}
+                        {{ pagos|length }} pago{{ 's' if pagos|length != 1 else '' }}
+                    {% else %}
+                        Sin pagos
+                    {% endif %}
+                </small>
+            </div>
+            
+            {% if cliente.inscripcion_pagada and cliente.curso %}
+            <div class="mt-2">
+                <small class="fw-bold">
+                    ✅ Inscripción completa
+                </small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+                
+            <!-- BARRA DE PROGRESO (SOLO SI HAY INSCRIPCIÓN) -->
+{% if cliente.curso and cliente.curso.precio_inscripcion > 0 %}
+<div class="mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="mb-0 fw-bold">
+            <i class="bi bi-bar-chart-fill"></i> Progreso de Inscripción
+        </h6>
+        <span class="badge bg-info" style="font-size: 14px; padding: 8px 12px;">
+            {{ "%.0f"|format(cliente.porcentaje_inscripcion) }}%
+        </span>
+    </div>
+    <div class="progress" style="height: 30px; border-radius: 15px; background: #e5e7eb; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);">
+        <div class="progress-bar {% if cliente.inscripcion_pagada %}bg-success{% else %}progress-bar-striped progress-bar-animated bg-warning{% endif %} fw-bold" 
+             role="progressbar" 
+             style="width: {{ "%.0f"|format(cliente.porcentaje_inscripcion) }}%; 
+                    font-size: 15px;
+                    border-radius: 15px;"
+             aria-valuenow="{{ cliente.porcentaje_inscripcion }}" 
+             aria-valuemin="0" 
+             aria-valuemax="100">
+            ${{ "%.2f"|format(cliente.abono_inscripcion) }} / ${{ "%.2f"|format(cliente.curso.precio_inscripcion) }}
+        </div>
+    </div>
+    <div class="mt-2 text-center">
+        {% if cliente.inscripcion_pagada %}
+            <small class="text-success fw-bold">
+                <i class="bi bi-check-circle-fill"></i> Inscripción completada
+            </small>
+        {% else %}
+            <small class="text-warning fw-bold">
+                <i class="bi bi-hourglass-split"></i> Pendiente: ${{ "%.2f"|format(cliente.inscripcion_pendiente) }}
+            </small>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
         <!-- Historial de Pagos -->
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
+        <div class="card shadow-sm" style="border-radius: 10px;">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-bold">
                     <i class="bi bi-clock-history"></i> Historial de Pagos
                 </h5>
                 <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" 
-                   class="btn btn-success btn-sm">
+                   class="btn btn-success">
                     <i class="bi bi-plus-circle"></i> Nuevo Pago
                 </a>
             </div>
-            <div class="card-body">
+            <div class="card-body p-0">
                 {% if pagos %}
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover mb-0">
                         <thead class="table-light">
                             <tr>
-                                <th>Fecha</th>
-                                <th>Monto</th>
-                                <th>Método</th>
-                                <th>Referencia</th>
-                                <th>Periodo</th>
-                                <th class="text-center">Acciones</th>
+                                <th style="padding: 15px;">Fecha</th>
+                                <th style="padding: 15px;">Monto</th>
+                                <th style="padding: 15px;">Método</th>
+                                <th style="padding: 15px;">Referencia</th>
+                                <th style="padding: 15px;">Periodo</th>
+                                <th class="text-center" style="padding: 15px;">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for pago in pagos %}
                             <tr>
-                                <td>
-                                    <strong>{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</strong><br>
-                                    <small class="text-muted">{{ pago.fecha_pago.strftime('%H:%M') }}</small>
+                                <td style="padding: 15px;">
+                                    <strong class="text-primary">{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</strong><br>
+                                    <small class="text-muted">
+                                        <i class="bi bi-clock"></i> {{ pago.fecha_pago.strftime('%H:%M') }}
+                                    </small>
                                 </td>
-                                <td>
-                                    <span class="badge bg-success fw-bold" style="font-size: 13px;">
+                                <td style="padding: 15px;">
+                                    <span class="badge bg-success fw-bold" style="font-size: 15px; padding: 10px 15px;">
                                         ${{ "%.2f"|format(pago.monto) }}
                                     </span>
                                 </td>
-                                <td>
+                                <td style="padding: 15px;">
                                     {% if pago.metodo_pago %}
-                                        <span class="badge bg-info">{{ pago.metodo_pago }}</span>
+                                        <span class="badge bg-info" style="font-size: 13px; padding: 8px 12px;">
+                                            {{ pago.metodo_pago }}
+                                        </span>
                                     {% else %}
                                         <span class="badge bg-secondary">N/A</span>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td style="padding: 15px;">
                                     {% if pago.referencia %}
-                                        <small class="font-monospace">{{ pago.referencia }}</small>
+                                        <small class="font-monospace bg-light p-2 rounded">
+                                            {{ pago.referencia }}
+                                        </small>
                                     {% else %}
                                         <small class="text-muted">-</small>
                                     {% endif %}
                                 </td>
-                                <td>{{ pago.periodo or '-' }}</td>
-                                <td class="text-center">
+                                <td style="padding: 15px;">
+                                    {% if pago.periodo %}
+                                        <span class="badge bg-light text-dark border">
+                                            <i class="bi bi-calendar3"></i> {{ pago.periodo }}
+                                        </span>
+                                    {% else %}
+                                        <small class="text-muted">-</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center" style="padding: 15px;">
                                     <button type="button" 
                                             class="btn btn-sm btn-outline-danger" 
                                             onclick="confirmarEliminarPago({{ pago.id }}, {{ pago.monto }})"
-                                            title="Eliminar"
+                                            title="Eliminar pago"
                                             data-bs-toggle="tooltip">
                                         <i class="bi bi-trash"></i>
                                     </button>
@@ -510,12 +646,16 @@
                         </tbody>
                         <tfoot class="table-light">
                             <tr>
-                                <td><strong>TOTAL</strong></td>
-                                <td colspan="5">
-                                    <strong class="text-success" style="font-size: 16px;">
+                                <td colspan="1" style="padding: 15px;">
+                                    <strong class="fs-5">TOTAL</strong>
+                                </td>
+                                <td colspan="5" style="padding: 15px;">
+                                    <strong class="text-success fs-4">
                                         ${{ "%.2f"|format(pagos|sum(attribute='monto')) }}
                                     </strong>
-                                    <small class="text-muted ms-2">({{ pagos|length }} pago{{ 's' if pagos|length != 1 else '' }})</small>
+                                    <small class="text-muted ms-2">
+                                        ({{ pagos|length }} pago{{ 's' if pagos|length != 1 else '' }})
+                                    </small>
                                 </td>
                             </tr>
                         </tfoot>
@@ -523,9 +663,10 @@
                 </div>
                 {% else %}
                 <div class="text-center py-5">
-                    <i class="bi bi-inbox" style="font-size: 64px; color: #ccc;"></i>
-                    <p class="text-muted mt-3 mb-3">No hay pagos registrados para este estudiante</p>
-                    <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" class="btn btn-success">
+                    <i class="bi bi-inbox" style="font-size: 80px; color: #ccc;"></i>
+                    <h4 class="mt-3 text-muted">Sin pagos registrados</h4>
+                    <p class="text-muted">Los pagos aparecerán aquí una vez registrados</p>
+                    <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" class="btn btn-success btn-lg mt-3">
                         <i class="bi bi-plus-circle"></i> Registrar Primer Pago
                     </a>
                 </div>
@@ -538,7 +679,7 @@
 
 {% block extra_js %}
 <script>
-    // Inicializar tooltips
+    // Inicializar tooltips de Bootstrap
     document.addEventListener('DOMContentLoaded', function() {
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
         tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -546,8 +687,9 @@
         });
     });
 
+    // Confirmación de eliminación de pago
     function confirmarEliminarPago(pagoId, monto) {
-        if (confirm(`¿Estás seguro de eliminar este pago de $${monto.toFixed(2)}?\n\n⚠️ Esta acción no se puede deshacer.`)) {
+        if (confirm(`¿Estás seguro de eliminar este pago de ${monto.toFixed(2)}?\n\n⚠️ Esta acción recalculará automáticamente la cobertura del estudiante.\n\n✓ Los datos se actualizarán correctamente.\n\nEsta acción NO se puede deshacer.`)) {
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = `/pagos/${pagoId}/eliminar`;
@@ -556,4 +698,22 @@
         }
     }
 </script>
-{% endblock %}
+{% endblock %}>${{ "%.2f"|format(cliente.saldo_pendiente) }}</h2>
+                                
+                                {% if cliente.saldo_pendiente > 0 %}
+                                <div class="mt-3 pt-3" style="border-top: 1px solid rgba(255,255,255,0.3);">
+                                    <small style="opacity: 0.9;">
+                                        Total: ${{ "%.2f"|format(cliente.total_programa) }}<br>
+                                        Pagado: ${{ "%.2f"|format(cliente.total_pagado) }}
+                                    </small>
+                                </div>
+                                {% else %}
+                                <div class="mt-3">
+                                    <small class="fw-bold">
+                                        <i class="bi bi-check-circle-fill"></i> Completado
+                                    </small>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>

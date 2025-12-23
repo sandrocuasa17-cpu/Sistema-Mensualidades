@@ -558,6 +558,16 @@ def _inscripcion_card(cliente) -> str:
     if mensualidades_canceladas is not None:
         rows.append(("✅ Mensualidades canceladas", str(mensualidades_canceladas)))
 
+    # Calcular saldos (si están disponibles)
+    if hasattr(cliente, 'total_programa') and hasattr(cliente, 'saldo_pendiente'):
+        total_programa = getattr(cliente, 'total_programa', None)
+        saldo_pendiente = getattr(cliente, 'saldo_pendiente', None)
+        
+        if total_programa is not None and total_programa > 0:
+            rows.append(("💼 Total del programa", _fmt_money(total_programa)))
+        if saldo_pendiente is not None:
+            rows.append(("📋 Saldo pendiente", _fmt_money(saldo_pendiente)))
+            
     if not rows:
         return ''
 
@@ -618,23 +628,27 @@ def enviar_confirmacion_pago(cliente, pago):
         periodo = getattr(pago, 'periodo', None) or '—'
         monto = _fmt_money(getattr(pago, 'monto', None))
 
-        dias_cobertura = 0
-        try:
-            if getattr(cliente, 'fecha_fin', None):
-                dias_cobertura = (cliente.fecha_fin.date() - datetime.now().date()).days
-        except Exception:
-            dias_cobertura = 0
-
-        if dias_cobertura >= 15:
-            estado_pill = "success"
-        elif dias_cobertura >= 0:
-            estado_pill = "warning"
-        else:
+        # Calcular días restantes correctamente
+        dias_cobertura = cliente.dias_restantes if cliente.dias_restantes is not None else 0
+        
+        # Determinar estado visual
+        if not cliente.ha_iniciado_clases:
+            estado_pill = "info"
+            dias_para_inicio = cliente.dias_para_inicio
+            estado_txt = f"Inicia clases en {dias_para_inicio} día{'s' if dias_para_inicio != 1 else ''}"
+        elif dias_cobertura < 0:
+            dias_vencido = abs(dias_cobertura)
             estado_pill = "danger"
-
-        estado_txt = (
-            f"{dias_cobertura} días restantes" if dias_cobertura >= 0 else f"Vencido hace {abs(dias_cobertura)} días"
-        )
+            estado_txt = f"Vencido hace {dias_vencido} día{'s' if dias_vencido != 1 else ''}"
+        elif dias_cobertura == 0:
+            estado_pill = "warning"
+            estado_txt = "Vence hoy"
+        elif dias_cobertura <= 7:
+            estado_pill = "warning"
+            estado_txt = f"Vence en {dias_cobertura} día{'s' if dias_cobertura != 1 else ''}"
+        else:
+            estado_pill = "success"
+            estado_txt = f"{dias_cobertura} días restantes"
 
         asunto = f"✅ Pago Confirmado - {empresa['nombre']}"
 
@@ -643,7 +657,7 @@ def enviar_confirmacion_pago(cliente, pago):
 
 <div class="message-box success">
   <div style="font-weight:900; font-size:16px; margin-bottom:6px;">✅ ¡Pago recibido exitosamente!</div>
-  <div class="muted">Tu membresía ha sido renovada y está completamente activa.</div>
+  <div class="muted">Hemos registrado tu pago y tu cuenta ha sido actualizada.</div>
 </div>
 
 <div class="section-title">Resumen del pago</div>
@@ -655,11 +669,12 @@ def enviar_confirmacion_pago(cliente, pago):
   <div class="info-row"><span class="info-label">💰 Monto pagado</span><span class="info-value">{_esc(monto)}</span></div>
 </div>
 
-<div class="section-title">Estado de tu membresía</div>
+<div class="section-title">Estado de tu cuenta</div>
 <div class="info-card">
   <div class="info-row"><span class="info-label">📚 Curso</span><span class="info-value">{_esc(curso_nombre)}</span></div>
-  <div class="info-row"><span class="info-label">💵 Mensualidad</span><span class="info-value">{_esc(curso_precio)}</span></div>
-  <div class="info-row"><span class="info-label">📌 Próximo vencimiento</span><span class="info-value">{_esc(fecha_vencimiento)}</span></div>
+  <div class="info-row"><span class="info-label">💵 Precio mensual</span><span class="info-value">{_esc(curso_precio)}</span></div>
+  <div class="info-row"><span class="info-label">📊 Mensualidades pagadas</span><span class="info-value">{cliente.mensualidades_canceladas}</span></div>
+  <div class="info-row"><span class="info-label">📌 Vencimiento</span><span class="info-value">{_esc(fecha_vencimiento)}</span></div>
   <div class="info-row"><span class="info-label">⏳ Estado</span><span class="info-value"><span class="pill {estado_pill}">{_esc(estado_txt)}</span></span></div>
 </div>
 
@@ -670,7 +685,7 @@ def enviar_confirmacion_pago(cliente, pago):
             empresa=empresa,
             tone="success",
             titulo="Pago confirmado",
-            subtitulo="Comprobante y detalle de tu membresía",
+            subtitulo="Comprobante y detalle de tu cuenta",
             cuerpo_html=cuerpo
         )
 
@@ -711,7 +726,6 @@ def enviar_confirmacion_pago(cliente, pago):
         current_app.logger.error(f"❌ Error enviando correo: {e}")
         current_app.logger.error(traceback.format_exc())
         return False
-
 
 def enviar_aviso_vencimiento(cliente, dias_para_vencer):
     """⚠️ AVISO DE VENCIMIENTO - Versión CORREGIDA"""
