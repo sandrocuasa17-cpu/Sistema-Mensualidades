@@ -47,6 +47,45 @@
             </div>
         </div>
 
+        <!-- ✅ ALERTA: PAGO ÚNICO PENDIENTE -->
+        {% if pago_unico_pendiente %}
+        <div class="alert alert-warning shadow-lg border-warning mb-4" style="border-left: 5px solid #ffc107;">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h4 class="alert-heading mb-2">
+                        <i class="bi bi-star-fill"></i> Pago Único del Curso Completo
+                    </h4>
+                    <p class="mb-2">
+                        Este estudiante eligió la modalidad de <strong>pago único</strong>. 
+                        Debe pagar el curso completo para activar su cobertura.
+                    </p>
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <small class="text-muted">Inscripción:</small><br>
+                            <strong>${{ "%.2f"|format(cliente.curso.precio_inscripcion) }}</strong>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <small class="text-muted">{{ cliente.curso.duracion_meses }} Mensualidades:</small><br>
+                            <strong>${{ "%.2f"|format(cliente.curso.precio_mensual * cliente.curso.duracion_meses) }}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4 text-center">
+                    <div class="p-3 bg-warning text-dark rounded">
+                        <small class="d-block mb-1">TOTAL A PAGAR</small>
+                        <h1 class="mb-0 fw-bold">${{ "%.2f"|format(monto_pago_unico) }}</h1>
+                    </div>
+                    <button type="button" 
+                            class="btn btn-warning btn-sm mt-2 w-100"
+                            onclick="document.getElementById('monto').value = {{ monto_pago_unico }}; actualizarVistaPrevia();">
+                        <i class="bi bi-lightning-fill"></i> Usar este monto
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- ✅ DESGLOSE DE DEUDAS MEJORADO -->
         {% if cliente.curso %}
         <div class="card mb-4 border-primary">
@@ -156,8 +195,19 @@
                 
                 <!-- Botones de Pago Rápido MEJORADOS -->
                 <div class="alert alert-light border mb-0">
-                    <strong><i class="bi bi-lightning-charge-fill text-warning"></i> Pagos Rápidos:</strong>
+                        <strong><i class="bi bi-lightning-charge-fill text-warning"></i> Pagos Rápidos:</strong>
                     <div class="btn-group-vertical w-100 mt-2" role="group">
+                        
+                        <!-- ✅ Botón de pago único (si está pendiente) -->
+                        {% if pago_unico_pendiente %}
+                            <button type="button" class="btn btn-outline-warning mb-2" 
+                                    onclick="seleccionarConcepto('auto', {{ monto_pago_unico }})">
+                                <i class="bi bi-star-fill"></i> Pagar Curso Completo (ÚNICO)
+                                <span class="badge bg-warning text-dark">${{ "%.2f"|format(monto_pago_unico) }}</span>
+                            </button>
+                            <hr class="my-2">
+                        {% endif %}
+                        
                         {% if not cliente.inscripcion_pagada %}
                             <button type="button" class="btn btn-outline-primary mb-2" 
                                     onclick="seleccionarConcepto('inscripcion', {{ cliente.inscripcion_pendiente }})">
@@ -398,9 +448,7 @@
                 </div>
             </div>
         </div>
-        {% endif %}
-    </div>
-</div>
+       {% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -602,6 +650,28 @@ document.addEventListener('DOMContentLoaded', function() {
             montoInput.focus();
             return false;
         }
+        
+        // ✅ Validación especial para pago único pendiente
+        {% if pago_unico_pendiente %}
+        const montoPagoUnico = {{ monto_pago_unico }};
+        const diferencia = Math.abs(monto - montoPagoUnico);
+        
+        if (diferencia > 0.01 && diferencia < montoPagoUnico * 0.1) {
+            // Si la diferencia es pequeña pero notable (menos del 10%)
+            const confirmacion = confirm(
+                `⚠️ ADVERTENCIA\n\n` +
+                `Este estudiante tiene pago único pendiente de $${montoPagoUnico.toFixed(2)}\n` +
+                `Estás registrando: $${monto.toFixed(2)}\n` +
+                `Diferencia: $${diferencia.toFixed(2)}\n\n` +
+                `¿Confirmas que deseas continuar con este monto?`
+            );
+            
+            if (!confirmacion) {
+                e.preventDefault();
+                return false;
+            }
+        }
+        {% endif %}
         
         // Deshabilitar botón
         btnSubmit.disabled = true;

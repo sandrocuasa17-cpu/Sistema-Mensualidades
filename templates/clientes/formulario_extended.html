@@ -150,13 +150,15 @@
                             <option value="{{ curso.id }}" 
                                     data-inscripcion="{{ curso.precio_inscripcion }}"
                                     data-mensual="{{ curso.precio_mensual }}"
+                                    data-duracion="{{ curso.duracion_meses if not curso.es_indefinido else 0 }}"
+                                    data-indefinido="{{ 'true' if curso.es_indefinido else 'false' }}"
+                                    data-pago-unico="{{ 'true' if curso.permite_pago_unico else 'false' }}"
                                     {% if cliente and cliente.curso_id == curso.id %}selected{% endif %}>
                                 {{ curso.nombre }} - Inscripción: ${{ "%.2f"|format(curso.precio_inscripcion) }} | Mensual: ${{ "%.2f"|format(curso.precio_mensual) }}
                             </option>
                             {% endfor %}
                         </select>
                         {% if cliente %}
-                        <!-- Mantener valor al editar -->
                         <input type="hidden" name="curso_id" value="{{ cliente.curso_id }}">
                         <small class="text-muted">
                             <i class="bi bi-lock-fill"></i> El curso no puede cambiarse después de la inscripción
@@ -193,10 +195,10 @@
                                     <div class="card bg-light h-100">
                                         <div class="card-body">
                                             <h6 class="text-muted mb-2">Duración</h6>
-                                            <h3 class="text-secondary mb-0">
+                                            <h3 id="cursoDuracion" class="text-secondary mb-0">
                                                 <i class="bi bi-infinity"></i>
                                             </h3>
-                                            <small class="text-muted">Indefinido</small>
+                                            <small id="cursoDuracionTexto" class="text-muted">Indefinido</small>
                                         </div>
                                     </div>
                                 </div>
@@ -215,11 +217,196 @@
                 </div>
             </div>
 
-            <!-- PASO 3: DATOS DE INSCRIPCIÓN -->
+            <!-- ✅ NUEVO: PASO 3 - MODALIDAD DE PAGO -->
+            <div id="modalidadPagoSection" class="card mb-4 shadow-lg" style="display: none; border-radius: 15px; border: 3px solid #f59e0b;">
+                <div class="card-header" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; padding: 20px; border-radius: 15px 15px 0 0;">
+                    <h4 class="mb-0 fw-bold">
+                        <span class="badge bg-white text-warning me-2" style="font-size: 18px;">3</span>
+                        <i class="bi bi-cash-stack"></i> Modalidad de Pago
+                    </h4>
+                </div>
+                <div class="card-body" style="padding: 30px;">
+                    <div class="alert alert-warning border-warning" style="border-left: 5px solid #f59e0b;">
+                        <i class="bi bi-star-fill"></i> 
+                        <strong>¡Este curso ofrece pago único!</strong><br>
+                        <small>El estudiante puede elegir pagar todo el curso de una vez con descuento o pagar mensualmente.</small>
+                    </div>
+
+                    <div class="row">
+                        <!-- Opción 1: Pago Mensual -->
+                        <div class="col-md-6 mb-3">
+                            <input type="radio" 
+                                   class="btn-check" 
+                                   name="modalidad_pago" 
+                                   id="modalidad_mensual" 
+                                   value="mensual"
+                                   checked>
+                            <label class="btn btn-outline-primary w-100 p-4" 
+                                   for="modalidad_mensual"
+                                   style="height: 100%; border: 3px solid #0d6efd; border-radius: 15px;">
+                                <div class="text-center">
+                                    <i class="bi bi-calendar-month" style="font-size: 48px;"></i>
+                                    <h4 class="mt-3 mb-2">Pago Mensual</h4>
+                                    <p class="mb-3">Paga mes a mes según asistas</p>
+                                    
+                                    <div class="card bg-light mb-3">
+                                        <div class="card-body">
+                                            <h5 class="text-primary mb-0">
+                                                $<span id="mensualTotal">0.00</span>
+                                            </h5>
+                                            <small class="text-muted">por mes</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <ul class="list-unstyled text-start small">
+                                        <li><i class="bi bi-check-circle-fill text-success"></i> Flexibilidad de pago</li>
+                                        <li><i class="bi bi-check-circle-fill text-success"></i> Sin compromiso a largo plazo</li>
+                                        <li><i class="bi bi-check-circle-fill text-success"></i> Puedes pausar si es necesario</li>
+                                    </ul>
+                                </div>
+                            </label>
+                        </div>
+
+                        <!-- Opción 2: Pago Único -->
+                        <div class="col-md-6 mb-3">
+                            <input type="radio" 
+                                   class="btn-check" 
+                                   name="modalidad_pago" 
+                                   id="modalidad_unico" 
+                                   value="unico">
+                            <label class="btn btn-outline-success w-100 p-4" 
+                                   for="modalidad_unico"
+                                   style="height: 100%; border: 3px solid #198754; border-radius: 15px; position: relative;">
+                
+                                <div class="text-center">
+                                    <i class="bi bi-lightning-charge-fill" style="font-size: 48px;"></i>
+                                    <h4 class="mt-3 mb-2">Pago Único</h4>
+                                    <p class="mb-3">Paga todo el curso de una vez</p>
+                                    
+                                    <div class="card bg-light mb-3">
+                                        <div class="card-body">
+                                            <h5 class="text-success mb-0">
+                                                $<span id="unicoTotal">0.00</span>
+                                            </h5>
+                                            <small class="text-muted">pago total</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <ul class="list-unstyled text-start small">
+                                        <li><i class="bi bi-check-circle-fill text-success"></i> Curso completo pagado</li>
+                                        <li><i class="bi bi-check-circle-fill text-success"></i> Sin preocupaciones mensuales</li>
+                                        <li><i class="bi bi-check-circle-fill text-success"></i> <span id="duracionTexto">Curso completo</span></li>
+                                    </ul>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    </div>
+
+                    <!-- ✅ NUEVA SECCIÓN: Información de Pago Único -->
+                    <div id="infoPagoUnico" class="alert alert-success border-success mt-4" style="display: none;">
+                        <h6 class="mb-3">
+                            <i class="bi bi-cash-coin"></i> Información del Pago Único
+                        </h6>
+                        
+                        <div class="alert alert-info mb-3">
+                            <small>
+                                <i class="bi bi-info-circle"></i> 
+                                <strong>Importante:</strong> Si el estudiante ya realizó el pago completo del curso, 
+                                registra aquí los datos de la transacción. Si aún no ha pagado, deja en blanco 
+                                y registra el pago después.
+                            </small>
+                        </div>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" 
+                                   type="checkbox" 
+                                   id="pago_realizado" 
+                                   name="pago_realizado"
+                                   value="1">
+                            <label class="form-check-label fw-bold" for="pago_realizado">
+                                <i class="bi bi-check-circle"></i> El estudiante ya realizó el pago completo
+                            </label>
+                        </div>
+
+                        <div id="datosPago" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="metodo_pago_inicial" class="form-label fw-bold">
+                                        <i class="bi bi-credit-card"></i> Método de Pago
+                                    </label>
+                                    <select class="form-select" id="metodo_pago_inicial" name="metodo_pago_inicial">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="Efectivo">💵 Efectivo</option>
+                                        <option value="Transferencia">🏦 Transferencia Bancaria</option>
+                                        <option value="Tarjeta">💳 Tarjeta de Crédito/Débito</option>
+                                        <option value="Depósito">🏧 Depósito Bancario</option>
+                                        <option value="PayPal">🅿️ PayPal</option>
+                                        <option value="Zelle">💸 Zelle</option>
+                                        <option value="Otro">📱 Otro</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <label for="referencia_inicial" class="form-label fw-bold">
+                                        <i class="bi bi-receipt"></i> Referencia/Comprobante
+                                    </label>
+                                    <input type="text" 
+                                           class="form-control" 
+                                           id="referencia_inicial" 
+                                           name="referencia_inicial" 
+                                           placeholder="Número de referencia">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="notas_pago_inicial" class="form-label fw-bold">
+                                    <i class="bi bi-chat-left-text"></i> Notas del Pago
+                                </label>
+                                <textarea class="form-control" 
+                                          id="notas_pago_inicial" 
+                                          name="notas_pago_inicial" 
+                                          rows="2"
+                                          placeholder="Detalles adicionales del pago..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comparación de costos -->
+                    <!-- Comparación de costos -->
+                    <div id="comparacionCostos" class="alert alert-light border mt-3" style="display: none;">
+                        <div class="row text-center">
+                            <div class="col-md-12">
+                                <h6 class="mb-3"><i class="bi bi-calculator"></i> Comparación de Costos</h6>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <small class="text-muted">Pago Mensual (Total)</small>
+                                        <h4 id="mensualTotalCurso" class="text-primary mb-0">$0.00</h4>
+                                        <small class="text-muted">Inscripción + <span id="mesesCurso">0</span> meses</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body">
+                                        <small style="opacity: 0.9;">Pago Único</small>
+                                        <h4 id="unicoTotalCurso" class="mb-0 fw-bold">$0.00</h4>
+                                        <small style="opacity: 0.9;">Mismo precio</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PASO 4: DATOS DE INSCRIPCIÓN -->
             <div class="card mb-4 shadow-sm" style="border-radius: 15px; border-left: 5px solid #f093fb;">
                 <div class="card-header" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 15px 15px 0 0;">
                     <h4 class="mb-0 fw-bold">
-                        <span class="badge bg-white text-danger me-2" style="font-size: 18px;">3</span>
+                        <span class="badge bg-white text-danger me-2" style="font-size: 18px;"><span id="pasoNumero">4</span></span>
                         <i class="bi bi-calendar-check"></i> Datos de Inscripción Académica
                     </h4>
                 </div>
@@ -333,8 +520,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const cursoSelect = document.getElementById('curso_id');
     const fechaInicioInput = document.getElementById('fecha_inicio_clases');
     const cursoInfo = document.getElementById('cursoInfo');
+    const modalidadPagoSection = document.getElementById('modalidadPagoSection');
     const btnSubmit = document.getElementById('btnSubmit');
     const formInscripcion = document.getElementById('formInscripcion');
+    const pasoNumero = document.getElementById('pasoNumero');
     
     // Actualizar información del curso
     function actualizarInfoCurso() {
@@ -343,14 +532,61 @@ document.addEventListener('DOMContentLoaded', function() {
         if (cursoSelect.value && selectedOption) {
             const precioInscripcion = parseFloat(selectedOption.getAttribute('data-inscripcion')) || 0;
             const precioMensual = parseFloat(selectedOption.getAttribute('data-mensual')) || 0;
+            const duracionMeses = parseInt(selectedOption.getAttribute('data-duracion')) || 0;
+            const esIndefinido = selectedOption.getAttribute('data-indefinido') === 'true';
+            const permitePagoUnico = selectedOption.getAttribute('data-pago-unico') === 'true';
             
+            // Actualizar vista previa básica
             document.getElementById('cursoInscripcion').textContent = '$' + precioInscripcion.toFixed(2);
             document.getElementById('cursoMensual').textContent = '$' + precioMensual.toFixed(2);
             document.getElementById('cursoPrimerPago').textContent = '$' + (precioInscripcion + precioMensual).toFixed(2);
             
+            // Actualizar duración
+            if (esIndefinido) {
+                document.getElementById('cursoDuracion').innerHTML = '<i class="bi bi-infinity"></i>';
+                document.getElementById('cursoDuracionTexto').textContent = 'Indefinido';
+            } else {
+                document.getElementById('cursoDuracion').textContent = duracionMeses;
+                document.getElementById('cursoDuracionTexto').textContent = duracionMeses + ' mes' + (duracionMeses !== 1 ? 'es' : '');
+            }
+            
             cursoInfo.style.display = 'block';
             
-            // Animar entrada
+            // Mostrar/ocultar sección de modalidad de pago
+            if (permitePagoUnico && !esIndefinido) {
+                modalidadPagoSection.style.display = 'block';
+                pasoNumero.textContent = '4';
+                
+                // Actualizar precios en las opciones
+                document.getElementById('mensualTotal').textContent = precioMensual.toFixed(2);
+                
+                const totalCurso = precioInscripcion + (precioMensual * duracionMeses);
+                document.getElementById('unicoTotal').textContent = totalCurso.toFixed(2);
+                document.getElementById('duracionTexto').textContent = duracionMeses + ' meses de curso';
+                
+                // Mostrar comparación
+                const comparacion = document.getElementById('comparacionCostos');
+                if (duracionMeses > 0) {
+                    comparacion.style.display = 'block';
+                    document.getElementById('mensualTotalCurso').textContent = '$' + totalCurso.toFixed(2);
+                    document.getElementById('unicoTotalCurso').textContent = '$' + totalCurso.toFixed(2);
+                    document.getElementById('mesesCurso').textContent = duracionMeses;
+                }
+                
+                // Animar entrada
+                modalidadPagoSection.style.opacity = '0';
+                modalidadPagoSection.style.transform = 'translateY(-20px)';
+                setTimeout(() => {
+                    modalidadPagoSection.style.transition = 'all 0.3s ease';
+                    modalidadPagoSection.style.opacity = '1';
+                    modalidadPagoSection.style.transform = 'translateY(0)';
+                }, 10);
+            } else {
+                modalidadPagoSection.style.display = 'none';
+                pasoNumero.textContent = '3';
+            }
+            
+            // Animar entrada del curso info
             cursoInfo.style.opacity = '0';
             cursoInfo.style.transform = 'translateY(-20px)';
             setTimeout(() => {
@@ -360,9 +596,68 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 10);
         } else {
             cursoInfo.style.display = 'none';
+            modalidadPagoSection.style.display = 'none';
+            pasoNumero.textContent = '3';
         }
     }
     
+   // ✅ NUEVO: Mostrar/ocultar sección de pago único
+    const modalidadRadios = document.querySelectorAll('input[name="modalidad_pago"]');
+    const infoPagoUnico = document.getElementById('infoPagoUnico');
+    const pagoRealizadoCheck = document.getElementById('pago_realizado');
+    const datosPago = document.getElementById('datosPago');
+    
+    function toggleInfoPagoUnico() {
+        const modalidadUnico = document.getElementById('modalidad_unico');
+        
+        if (modalidadUnico && modalidadUnico.checked) {
+            infoPagoUnico.style.display = 'block';
+            // Animar entrada
+            infoPagoUnico.style.opacity = '0';
+            infoPagoUnico.style.transform = 'translateY(-10px)';
+            setTimeout(() => {
+                infoPagoUnico.style.transition = 'all 0.3s ease';
+                infoPagoUnico.style.opacity = '1';
+                infoPagoUnico.style.transform = 'translateY(0)';
+            }, 10);
+        } else {
+            infoPagoUnico.style.display = 'none';
+            // Limpiar campos si se oculta
+            pagoRealizadoCheck.checked = false;
+            datosPago.style.display = 'none';
+        }
+    }
+    
+    // Mostrar/ocultar campos de pago según checkbox
+    pagoRealizadoCheck.addEventListener('change', function() {
+        if (this.checked) {
+            datosPago.style.display = 'block';
+        } else {
+            datosPago.style.display = 'none';
+        }
+    });
+    
+    // Event listener para cambio de modalidad
+    modalidadRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            toggleInfoPagoUnico();
+            
+            // Resaltar opción seleccionada
+            modalidadRadios.forEach(r => {
+                const label = document.querySelector(`label[for="${r.id}"]`);
+                if (r.checked) {
+                    label.style.backgroundColor = '';
+                    label.style.borderWidth = '3px';
+                } else {
+                    label.style.backgroundColor = '';
+                    label.style.borderWidth = '2px';
+                }
+            });
+        });
+    });
+    
+    // Inicializar estado al cargar
+    toggleInfoPagoUnico();
     // Event listeners
     cursoSelect.addEventListener('change', actualizarInfoCurso);
     
@@ -393,4 +688,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
-{% endblock %}
+{% endblock %} r.value === 'unico' ? '#d4edda' : '#cfe2ff';
+                    label.style.borderWidth = '3px';
+                } else {
+                    label.style.backgroundColor =

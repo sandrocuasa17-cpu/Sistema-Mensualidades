@@ -139,7 +139,42 @@
     </div>
 </div>
 {% endif %}
-
+<!-- ✅ ALERTA: PAGO ÚNICO PENDIENTE -->
+{% if cliente.modalidad_pago == 'unico' and cliente.mensualidades_canceladas == 0 and cliente.curso and not cliente.curso.es_indefinido %}
+<div class="alert alert-warning shadow-sm" style="border-left: 5px solid #ffc107; border-radius: 10px;">
+    <div class="d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill me-3" style="font-size: 48px;"></i>
+        <div class="flex-grow-1">
+            <h5 class="alert-heading mb-1 fw-bold">⏳ Pago Único Pendiente</h5>
+            <p class="mb-2">
+                El estudiante eligió pagar el curso completo pero aún no ha realizado el pago.
+            </p>
+            <hr>
+            <div class="row">
+                <div class="col-md-6 mb-2">
+                    <strong>Monto total:</strong><br>
+                    <span class="fs-4 text-success">
+                        ${{ "%.2f"|format(cliente.curso.precio_inscripcion + (cliente.curso.precio_mensual * cliente.curso.duracion_meses)) }}
+                    </span>
+                </div>
+                <div class="col-md-6 mb-2">
+                    <strong>Incluye:</strong><br>
+                    <small>
+                        • Inscripción: ${{ "%.2f"|format(cliente.curso.precio_inscripcion) }}<br>
+                        • {{ cliente.curso.duracion_meses }} mensualidades: ${{ "%.2f"|format(cliente.curso.precio_mensual * cliente.curso.duracion_meses) }}
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div>
+            <a href="{{ url_for('pago_nuevo', cliente_id=cliente.id) }}" 
+               class="btn btn-warning btn-lg">
+                <i class="bi bi-credit-card-fill"></i> Registrar Pago Completo
+            </a>
+        </div>
+    </div>
+</div>
+{% endif %}
 <!-- Alerta de Vencimiento -->
 {% if cliente.plan_vencido %}
 <div class="alert alert-danger shadow-sm" style="border-left: 5px solid #dc3545; border-radius: 10px;">
@@ -331,12 +366,18 @@
                     </div>
                     <div class="col-md-3 text-center">
                         <h6 class="text-muted mb-1">Duración</h6>
+                        {% if cliente.curso.es_indefinido %}
                         <h1 class="text-info mb-0">
                             <i class="bi bi-infinity"></i>
                         </h1>
                         <small class="text-muted">Indefinido</small>
+                        {% else %}
+                        <h1 class="text-primary mb-0 fw-bold">
+                            {{ cliente.curso.duracion_meses }}
+                        </h1>
+                        <small class="text-muted">{{ 'meses' if cliente.curso.duracion_meses != 1 else 'mes' }}</small>
+                        {% endif %}
                     </div>
-                </div>
                 
                 <!-- Información de Vencimiento -->
                 {% if cliente.fecha_fin %}

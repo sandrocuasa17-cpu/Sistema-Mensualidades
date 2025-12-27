@@ -44,7 +44,8 @@ class BackupManager:
     def _backups_disponibles(self):
         """Verifica si los backups están disponibles"""
         if not self.is_sqlite:
-            return False, "⚠️ Los backups solo funcionan con SQLite (desarrollo local)"
+    return False, "⚠️ Los backups solo funcionan con SQLite"
+
         return True, "✅ Backups disponibles"
     
     def obtener_ruta_bd(self):

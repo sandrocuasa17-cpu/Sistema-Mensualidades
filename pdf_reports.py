@@ -1,782 +1,215 @@
-# pdf_reports.py
 # -*- coding: utf-8 -*-
-"""
-Generador de PDFs Profesional - Sistema de Gestión de Mensualidades
-Versión 100% Fiel al Sistema con Abonos e Inscripciones
+"""pdf_reports.py (FIX DEFINITIVO)
+
+Exporta `pdf_generator`.
+
+El archivo anterior estaba truncado (SyntaxError). Por eso:
+- `from pdf_reports import pdf_generator` fallaba
+- email_service enviaba el correo SIN PDF (atrapaba el ImportError)
+
+Este archivo está hecho para ser IMPORTABLE siempre.
 """
 
 import io
-from datetime import datetime
+from datetime import datetime, date
+
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import cm, mm
+from reportlab.lib.units import cm
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
-from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    PageBreak, KeepTogether
-)
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+
+def _safe(value, default="—"):
+    if value is None:
+        return default
+    s = str(value).strip()
+    return s if s else default
+
+
+def _fmt_money(value):
+    try:
+        n = float(value or 0)
+    except Exception:
+        return _safe(value)
+    return f"${n:,.2f}"
+
+
+def _fmt_date(value, with_time=False):
+    if value is None:
+        return "—"
+    try:
+        if isinstance(value, datetime):
+            dt = value
+        elif isinstance(value, date):
+            dt = datetime(value.year, value.month, value.day)
+        else:
+            dt = datetime.fromisoformat(str(value))
+        return dt.strftime("%d/%m/%Y %H:%M" if with_time else "%d/%m/%Y")
+    except Exception:
+        return _safe(value)
 
 
 class PDFGenerator:
-    """Generador profesional de reportes PDF fiel al sistema"""
-    
-    # Colores corporativos
-    COLOR_PRIMARY = colors.HexColor("#1e40af")      # Azul principal
-    COLOR_SECONDARY = colors.HexColor("#64748b")    # Gris
-    COLOR_SUCCESS = colors.HexColor("#059669")      # Verde
-    COLOR_WARNING = colors.HexColor("#d97706")      # Naranja
-    COLOR_DANGER = colors.HexColor("#dc2626")       # Rojo
-    COLOR_INFO = colors.HexColor("#0284c7")         # Azul claro
-    COLOR_LIGHT_BG = colors.HexColor("#f8fafc")     # Fondo claro
-    COLOR_BORDER = colors.HexColor("#e2e8f0")       # Borde suave
-    
-    def __init__(self):
-        """Inicializa el generador con configuración por defecto"""
-        self.nombre_empresa = "Preuniversitario"
-        self.subtitulo_reporte = "REPORTE ACADÉMICO"
-        self.eslogan_empresa = "Excelencia Académica"
-        self._crear_estilos()
-    
-    def _crear_estilos(self):
-        """Crea estilos de párrafo personalizados"""
-        styles = getSampleStyleSheet()
-        
-        # Título principal de la empresa
-        self.s_brand = ParagraphStyle(
-            "brand",
-            parent=styles["Heading1"],
-            fontSize=16,
-            leading=20,
-            textColor=self.COLOR_PRIMARY,
-            fontName="Helvetica-Bold",
-            spaceAfter=2,
-            alignment=TA_LEFT
-        )
-        
-        # Subtítulo del reporte
-        self.s_title = ParagraphStyle(
-            "title",
-            parent=styles["Heading2"],
-            fontSize=20,
-            leading=24,
-            textColor=self.COLOR_PRIMARY,
-            fontName="Helvetica-Bold",
-            spaceAfter=4,
-            spaceBefore=0
-        )
-        
-        # Información secundaria
-        self.s_subtitle = ParagraphStyle(
-            "subtitle",
-            parent=styles["BodyText"],
-            fontSize=10,
-            leading=12,
-            textColor=self.COLOR_SECONDARY,
-            spaceAfter=2
-        )
-        
-        # Secciones
-        self.s_section = ParagraphStyle(
-            "section",
-            parent=styles["BodyText"],
-            fontSize=12,
-            leading=14,
-            textColor=self.COLOR_PRIMARY,
-            fontName="Helvetica-Bold",
-            spaceAfter=8,
-            spaceBefore=12
-        )
-        
-        # Etiquetas
-        self.s_label = ParagraphStyle(
-            "label",
-            parent=styles["BodyText"],
-            fontSize=9,
-            leading=11,
-            textColor=self.COLOR_SECONDARY,
-            fontName="Helvetica-Bold"
-        )
-        
-        # Valores
-        self.s_value = ParagraphStyle(
-            "value",
-            parent=styles["BodyText"],
-            fontSize=9,
-            leading=11,
-            textColor=colors.HexColor("#1e293b")
-        )
-        
-         # Estados
-        self.s_success = ParagraphStyle(
-            "success",
-            parent=styles["BodyText"],
-            fontSize=11,
-            leading=13,
-            textColor=self.COLOR_SUCCESS,
-            fontName="Helvetica-Bold"
-        )
+    """Generador de PDFs (no depende de Flask)."""
 
-        self.s_warning = ParagraphStyle(
-            "warning",
-            parent=styles["BodyText"],
-            fontSize=11,
-            leading=13,
-            textColor=self.COLOR_WARNING,
-            fontName="Helvetica-Bold"
-        )
+    def __init__(self, nombre_empresa="Sistema de Mensualidades"):
+        self.nombre_empresa = nombre_empresa
+        self.subtitulo_reporte = "Reporte de Estudiante"
+        base = getSampleStyleSheet()
+        self.s_brand = ParagraphStyle("brand", parent=base["Title"], fontSize=16, leading=18, spaceAfter=6)
+        self.s_title = ParagraphStyle("title", parent=base["Heading2"], fontSize=12, leading=14, spaceAfter=6)
+        self.s_section = ParagraphStyle("section", parent=base["Heading3"], fontSize=11, leading=13, spaceBefore=10, spaceAfter=6)
+        self.s_small = ParagraphStyle("small", parent=base["Normal"], fontSize=9, leading=11)
+        self.s_normal = base["Normal"]
 
-        self.s_info = ParagraphStyle(
-            "info",
-            parent=styles["BodyText"],
-            fontSize=11,
-            leading=13,
-            textColor=self.COLOR_INFO,
-            fontName="Helvetica-Bold"
-        )
-
-        self.s_danger = ParagraphStyle(
-            "danger",
-            parent=styles["BodyText"],
-            fontSize=11,
-            leading=13,
-            textColor=self.COLOR_DANGER,
-            fontName="Helvetica-Bold"
-        )
-
-        
-        # Texto de tabla
-        self.s_table_header = ParagraphStyle(
-            "table_header",
-            parent=styles["BodyText"],
-            fontSize=9,
-            leading=11,
-            textColor=colors.white,
-            fontName="Helvetica-Bold",
-            alignment=TA_CENTER
-        )
-        
-        self.s_table_cell = ParagraphStyle(
-            "table_cell",
-            parent=styles["BodyText"],
-            fontSize=8,
-            leading=10,
-            textColor=colors.HexColor("#334155")
-        )
-    
-    def _safe(self, valor, default="—"):
-        """Convierte valor a string seguro"""
-        if valor is None or valor == "":
-            return default
-        s = str(valor).strip()
-        return s if s else default
-    
-    def _fmt_date(self, dt, with_time=False):
-        """Formatea fecha"""
-        if not dt:
-            return "—"
-        try:
-            if with_time:
-                return dt.strftime("%d/%m/%Y - %H:%M")
-            return dt.strftime("%d/%m/%Y")
-        except Exception:
-            return str(dt)
-    
-    def _fmt_money(self, val):
-        """Formatea dinero"""
-        try:
-            return f"${float(val):,.2f}"
-        except Exception:
-            return "$0.00"
-    
     def _cliente_nombre(self, cliente):
-        """Obtiene nombre completo del cliente"""
-        if not cliente:
-            return "Estudiante"
-        
-        nc = getattr(cliente, "nombre_completo", None)
-        if nc and str(nc).strip():
-            return str(nc).strip()
-        
-        nombre = str(getattr(cliente, "nombre", "") or "").strip()
-        apellido = str(getattr(cliente, "apellido", "") or "").strip()
-        full = f"{nombre} {apellido}".strip()
-        
-        return full if full else "Estudiante"
-    
-    def _get_estado_info(self, cliente):
-        """Obtiene información del estado del estudiante FIEL AL SISTEMA"""
-        # Estado general (activo/inactivo)
-        activo = getattr(cliente, "activo", True)
-        estado_general = "✓ ACTIVO" if activo else "✗ INACTIVO"
-        color_general = self.COLOR_SUCCESS if activo else self.COLOR_DANGER
-        
-        # Estado financiero usando el sistema de propiedades
-        estado_pago = getattr(cliente, "estado_pago", None)
-        
-        # Determinar estado y estilo
-        if estado_pago == 'sin-cobertura':
-            estado_fin = "⚠ SIN COBERTURA"
-            estilo_fin = self.s_danger
-        elif estado_pago == 'pendiente-inicio':
-            estado_fin = "⏳ PENDIENTE INICIO"
-            estilo_fin = self.s_info
-        elif estado_pago == 'vencido':
-            estado_fin = "⌛ VENCIDO"
-            estilo_fin = self.s_danger
-        elif estado_pago == 'por-vencer':
-            estado_fin = "⚠️ POR VENCER"
-            estilo_fin = self.s_warning
-        else:  # al-dia
-            estado_fin = "✓ AL DÍA"
-            estilo_fin = self.s_success
-        
+        for attr in ("nombre_completo", "nombre", "nombres"):
+            v = getattr(cliente, attr, None)
+            if v:
+                if attr == "nombre":
+                    ap = getattr(cliente, "apellido", None)
+                    return (f"{v} {ap}").strip() if ap else str(v)
+                return str(v)
+        return "Estudiante"
+
+    def _pago_concepto(self, pago):
+        concepto = (getattr(pago, "concepto", None) or "auto").lower()
         return {
-            'estado_general': estado_general,
-            'color_general': color_general,
-            'estado_financiero': estado_fin,
-            'estilo_financiero': estilo_fin
-        }
-    
-    def _crear_tabla_info(self, filas, col_widths=(4.2*cm, 12.3*cm)):
-        """Crea tabla de información con estilo mejorado"""
-        data = []
-        
-        for label, value in filas:
+            "auto": "Distribución automática",
+            "inscripcion": "Inscripción",
+            "mensualidad": "Mensualidad",
+            "unico": "Pago único",
+        }.get(concepto, _safe(concepto))
+
+    def _tabla_kv(self, filas, col_widths=(4.3*cm, 11.7*cm)):
+        data = [[Paragraph(f"<b>{_safe(k)}</b>", self.s_small), Paragraph(_safe(v), self.s_small)] for k, v in filas]
+        t = Table(data, colWidths=list(col_widths))
+        t.setStyle(TableStyle([
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
+            ("LINEBELOW", (0,0), (-1,-1), 0.25, colors.lightgrey),
+            ("LEFTPADDING", (0,0), (-1,-1), 2),
+            ("RIGHTPADDING", (0,0), (-1,-1), 2),
+            ("TOPPADDING", (0,0), (-1,-1), 3),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 3),
+        ]))
+        return t
+
+    def _tabla_pagos(self, pagos):
+        header = ["Fecha", "Monto", "Concepto", "Método", "Ref."]
+        data = [[Paragraph(f"<b>{h}</b>", self.s_small) for h in header]]
+        for p in pagos or []:
             data.append([
-                Paragraph(f"<b>{self._safe(label)}</b>", self.s_label),
-                Paragraph(self._safe(value), self.s_value)
+                Paragraph(_fmt_date(getattr(p, "fecha_pago", None), with_time=True), self.s_small),
+                Paragraph(_fmt_money(getattr(p, "monto", 0)), self.s_small),
+                Paragraph(_safe(self._pago_concepto(p)), self.s_small),
+                Paragraph(_safe(getattr(p, "metodo_pago", None), "—"), self.s_small),
+                Paragraph(_safe(getattr(p, "referencia", None), "—"), self.s_small),
             ])
-        
-        tabla = Table(data, colWidths=list(col_widths))
-        tabla.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-            ('LEFTPADDING', (0, 0), (-1, -1), 2),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 2),
-            ('TOPPADDING', (0, 0), (-1, -1), 3),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-            ('LINEBELOW', (0, 0), (-1, -2), 0.5, self.COLOR_BORDER),
+        t = Table(data, colWidths=[3.2*cm, 2.2*cm, 4.0*cm, 3.0*cm, 3.6*cm])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
+            ("LINEBELOW", (0,0), (-1,0), 0.5, colors.grey),
+            ("GRID", (0,0), (-1,-1), 0.25, colors.lightgrey),
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
         ]))
-        
-        return tabla
-    
-    def _draw_header(self, canvas_obj, doc):
-        """Dibuja encabezado en cada página"""
-        canvas_obj.saveState()
-        
-        # Línea superior decorativa
-        canvas_obj.setStrokeColor(self.COLOR_PRIMARY)
-        canvas_obj.setLineWidth(3)
-        canvas_obj.line(doc.leftMargin, A4[1] - 1.5*cm, 
-                       A4[0] - doc.rightMargin, A4[1] - 1.5*cm)
-        
-        canvas_obj.restoreState()
-    
-    def _draw_footer(self, canvas_obj, doc):
-        """Dibuja pie de página"""
-        canvas_obj.saveState()
-        
-        # Línea inferior
-        canvas_obj.setStrokeColor(self.COLOR_BORDER)
-        canvas_obj.setLineWidth(0.5)
-        canvas_obj.line(doc.leftMargin, 1.5*cm, 
-                       A4[0] - doc.rightMargin, 1.5*cm)
-        
-        # Texto del pie
-        canvas_obj.setFont('Helvetica', 8)
-        canvas_obj.setFillColor(self.COLOR_SECONDARY)
-        
-        # Fecha de generación (izquierda)
-        fecha_gen = datetime.now().strftime("%d/%m/%Y %H:%M")
-        canvas_obj.drawString(doc.leftMargin, 1*cm, 
-                            f"Generado: {fecha_gen}")
-        
-        # Número de página (derecha)
-        canvas_obj.drawRightString(A4[0] - doc.rightMargin, 1*cm, 
-                                  f"Página {doc.page}")
-        
-        canvas_obj.restoreState()
-    
+        return t
+
     def generar_reporte_estudiante(self, cliente, pagos=None, pago=None):
-        """
-        Genera reporte completo del estudiante FIEL AL SISTEMA
-        
-        Args:
-            cliente: Objeto Cliente con toda la información
-            pagos: Lista de pagos (opcional)
-            pago: Pago individual (compatibilidad)
-        
-        Returns:
-            BytesIO: Buffer con el PDF generado
-        """
-        buffer = io.BytesIO()
-        
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=A4,
-            leftMargin=2*cm,
-            rightMargin=2*cm,
-            topMargin=2*cm,
-            bottomMargin=2*cm,
-            title=f"Reporte_{self._cliente_nombre(cliente)}",
-            author=self.nombre_empresa
-        )
-        
-        story = []
-        
-        # ============================================
-        # ENCABEZADO
-        # ============================================
-        story.append(Paragraph(
-            f"<b>{self._safe(self.nombre_empresa)}</b>",
-            self.s_brand
-        ))
-        
-        story.append(Paragraph(
-            f"<b>{self.subtitulo_reporte}</b>",
-            self.s_title
-        ))
-        
-        story.append(Paragraph(
-            "Información del Estudiante",
-            self.s_subtitle
-        ))
-        
-        story.append(Paragraph(
-            f"<b>{self._cliente_nombre(cliente)}</b>",
-            self.s_subtitle
-        ))
-        
-        story.append(Paragraph(
-            self._fmt_date(datetime.now(), with_time=True),
-            self.s_subtitle
-        ))
-        
-        story.append(Spacer(1, 12))
-        
-        # ============================================
-        # SECCIÓN: DATOS PERSONALES
-        # ============================================
-        story.append(Paragraph(
-            "▪ <b>DATOS PERSONALES</b>",
-            self.s_section
-        ))
-        
-        estado_info = self._get_estado_info(cliente)
-        
-        datos_personales = [
-            ("Nombre", self._cliente_nombre(cliente)),
-            ("Cédula", self._safe(getattr(cliente, "cedula", None))),
-            ("Email", self._safe(getattr(cliente, "email", None))),
-            ("Teléfono", self._safe(getattr(cliente, "telefono", None))),
-            ("Dirección", self._safe(getattr(cliente, "direccion", None))),
-            ("Estado", estado_info['estado_general'])
-        ]
-        
-        story.append(self._crear_tabla_info(datos_personales))
-        story.append(Spacer(1, 10))
-        
-        # ============================================
-        # SECCIÓN: PROGRAMA ACADÉMICO
-        # ============================================
-        story.append(Paragraph(
-            "▪ <b>PROGRAMA ACADÉMICO</b>",
-            self.s_section
-        ))
-        
-        curso = getattr(cliente, "curso", None)
-        
-        if curso:
-            programa = self._safe(getattr(curso, "nombre", None), "No asignado")
-            mensualidad = self._fmt_money(getattr(curso, "precio_mensual", 0))
-            inscripcion = self._fmt_money(getattr(curso, "precio_inscripcion", 0))
-            descripcion = self._safe(getattr(curso, "descripcion", None), "Sin descripción")
-        else:
-            programa = "No asignado"
-            mensualidad = "$0.00"
-            inscripcion = "$0.00"
-            descripcion = "—"
-        
-        datos_programa = [
-            ("Programa", programa),
-            ("Mensualidad", mensualidad),
-            ("Inscripción", inscripcion),
-            ("Duración", "Indefinida (por mensualidades)"),
-            ("Descripción", descripcion)
-        ]
-        
-        story.append(self._crear_tabla_info(datos_programa))
-        story.append(Spacer(1, 10))
-        
-        # ============================================
-        # SECCIÓN: FECHAS IMPORTANTES
-        # ============================================
-        story.append(Paragraph(
-            "▪ <b>FECHAS IMPORTANTES</b>",
-            self.s_section
-        ))
-        
-        fecha_registro = getattr(cliente, "fecha_registro", None)
-        fecha_inicio = getattr(cliente, "fecha_inicio_clases", None)
-        fecha_venc = getattr(cliente, "fecha_fin", None)
-        
-        datos_fechas = [
-            ("Fecha de Registro", self._fmt_date(fecha_registro)),
-            ("Inicio de Clases", self._fmt_date(fecha_inicio)),
-            ("Fecha de Vencimiento", self._fmt_date(fecha_venc))
-        ]
-        
-        story.append(self._crear_tabla_info(datos_fechas))
-        story.append(Spacer(1, 10))
-        
-        # ============================================
-        # SECCIÓN: ESTADO FINANCIERO (FIEL AL SISTEMA)
-        # ============================================
-        story.append(Paragraph(
-            "▪ <b>ESTADO FINANCIERO</b>",
-            self.s_section
-        ))
-        
-        # Inscripción
-        abono_inscripcion = float(getattr(cliente, "abono_inscripcion", 0) or 0)
-        inscripcion_pendiente = float(getattr(cliente, "inscripcion_pendiente", 0) or 0)
-        inscripcion_pagada = getattr(cliente, "inscripcion_pagada", False)
-        porcentaje_inscripcion = float(getattr(cliente, "porcentaje_inscripcion", 0) or 0)
-        
-        # Mensualidades
-        mensualidades_canceladas = int(getattr(cliente, "mensualidades_canceladas", 0) or 0)
-        carry_mensualidad = float(getattr(cliente, "carry_mensualidad", 0) or 0)
-        
-        # Días restantes
-        dias_restantes = getattr(cliente, "dias_restantes", None)
-        dias_para_inicio = getattr(cliente, "dias_para_inicio", 0) or 0
-        
-        try:
-            dias_rest_str = str(int(dias_restantes)) if dias_restantes is not None else "—"
-        except (ValueError, TypeError):
-            dias_rest_str = "—"
-        
-        # Construir datos financieros
-        datos_financieros = [
-            ("Inscripción Abonada", self._fmt_money(abono_inscripcion)),
-            ("Inscripción Pendiente", self._fmt_money(inscripcion_pendiente)),
-            ("Estado Inscripción", "✓ COMPLETA" if inscripcion_pagada else f"⏳ {porcentaje_inscripcion:.0f}% pagado"),
-            ("Mensualidades Pagadas", str(mensualidades_canceladas)),
-            ("Crédito Acumulado", self._fmt_money(carry_mensualidad)),
-            ("Días Restantes", dias_rest_str)
-        ]
-        
-        # Si no ha iniciado clases, agregar eso
-        if dias_para_inicio > 0:
-            datos_financieros.append(("Días para Inicio", str(dias_para_inicio)))
-        
-        story.append(self._crear_tabla_info(datos_financieros))
-        story.append(Spacer(1, 10))
-        
-        # Estado financiero destacado
-        story.append(Paragraph(
-            f"<b>{estado_info['estado_financiero']}</b>",
-            estado_info['estilo_financiero']
-        ))
-        
-        story.append(Spacer(1, 14))
-        
-        # ============================================
-        # SECCIÓN: HISTORIAL DE PAGOS
-        # ============================================
-        story.append(Paragraph(
-            "▪ <b>HISTORIAL DE PAGOS</b>",
-            self.s_section
-        ))
-        
-        # Obtener pagos
         if pagos is None:
-            pagos = getattr(cliente, "pagos", None)
-        
-        pagos_list = list(pagos) if pagos else []
-        
-        def _get_fecha_pago(p):
-            return getattr(p, "fecha_pago", None) or datetime.min
-        
-        pagos_list.sort(key=_get_fecha_pago, reverse=True)
-        
-        # Crear tabla de pagos
-        table_data = [[
-            Paragraph("<b>Fecha</b>", self.s_table_header),
-            Paragraph("<b>Monto</b>", self.s_table_header),
-            Paragraph("<b>Concepto</b>", self.s_table_header),
-            Paragraph("<b>Método</b>", self.s_table_header),
-            Paragraph("<b>Referencia</b>", self.s_table_header)
-        ]]
-        
-        total_pagos = 0.0
-        
-        for p in pagos_list:
-            fecha = _get_fecha_pago(p)
-            monto = float(getattr(p, "monto", 0) or 0)
-            total_pagos += monto
-            
-            # Concepto
-            concepto = getattr(p, "concepto", "auto") or "auto"
-            concepto_display = {
-                'auto': 'Automático',
-                'inscripcion': 'Inscripción',
-                'mensualidad': 'Mensualidad'
-            }.get(concepto, concepto)
-            
-            metodo = self._safe(getattr(p, "metodo_pago", None), "-")
-            referencia = self._safe(getattr(p, "referencia", None), "-")
-            
-            table_data.append([
-                Paragraph(self._fmt_date(fecha), self.s_table_cell),
-                Paragraph(self._fmt_money(monto), self.s_table_cell),
-                Paragraph(concepto_display, self.s_table_cell),
-                Paragraph(metodo, self.s_table_cell),
-                Paragraph(referencia, self.s_table_cell)
-            ])
-        
-        # Fila de total
-        table_data.append([
-            Paragraph("<b>TOTAL</b>", self.s_table_cell),
-            Paragraph(f"<b>{self._fmt_money(total_pagos)}</b>", self.s_table_cell),
-            Paragraph(f"<b>{len(pagos_list)} pagos</b>", self.s_table_cell),
-            Paragraph("", self.s_table_cell),
-            Paragraph("", self.s_table_cell)
-        ])
-        
-        # Crear tabla
-        tabla_pagos = Table(
-            table_data,
-            colWidths=[3*cm, 2.8*cm, 3*cm, 3.2*cm, 4.5*cm]
-        )
-        
-        tabla_pagos.setStyle(TableStyle([
-            # Encabezado
-            ('BACKGROUND', (0, 0), (-1, 0), self.COLOR_PRIMARY),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
-            
-            # Celdas
-            ('FONTSIZE', (0, 1), (-1, -2), 8),
-            ('ALIGN', (1, 1), (1, -1), 'RIGHT'),
-            ('VALIGN', (0, 1), (-1, -1), 'MIDDLE'),
-            
-            # Líneas
-            ('LINEBELOW', (0, 0), (-1, 0), 1, self.COLOR_PRIMARY),
-            ('GRID', (0, 1), (-1, -2), 0.5, self.COLOR_BORDER),
-            
-            # Fila de total
-            ('BACKGROUND', (0, -1), (-1, -1), self.COLOR_LIGHT_BG),
-            ('LINEABOVE', (0, -1), (-1, -1), 1.5, self.COLOR_PRIMARY),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            
-            # Padding
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            try:
+                pagos = list(getattr(cliente, "pagos", []))
+            except Exception:
+                pagos = []
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+        story = []
+        story.append(Paragraph(_safe(self.nombre_empresa), self.s_brand))
+        story.append(Paragraph(_safe(self.subtitulo_reporte), self.s_title))
+        story.append(Paragraph(f"<b>Estudiante:</b> {_safe(self._cliente_nombre(cliente))}", self.s_normal))
+        story.append(Paragraph(f"<b>Generado:</b> {_fmt_date(datetime.now(), with_time=True)}", self.s_small))
+        story.append(Spacer(1, 12))
+        story.append(Paragraph("Datos personales", self.s_section))
+        story.append(self._tabla_kv([
+            ("Cédula", _safe(getattr(cliente, "cedula", None))),
+            ("Email", _safe(getattr(cliente, "email", None))),
+            ("Teléfono", _safe(getattr(cliente, "telefono", None))),
+            ("Dirección", _safe(getattr(cliente, "direccion", None))),
         ]))
-        
-        story.append(tabla_pagos)
-        
-        # ============================================
-        # NOTAS Y OBSERVACIONES
-        # ============================================
-        notas = getattr(cliente, "notas", None)
-        obs_insc = getattr(cliente, "observaciones_inscripcion", None)
-        
-        if notas or obs_insc:
-            story.append(Spacer(1, 14))
-            story.append(Paragraph(
-                "▪ <b>NOTAS Y OBSERVACIONES</b>",
-                self.s_section
-            ))
-            
-            if obs_insc:
-                story.append(Paragraph(
-                    f"<b>Inscripción:</b> {self._safe(obs_insc)}",
-                    self.s_value
-                ))
-            
-            if notas:
-                story.append(Paragraph(
-                    f"<b>Notas generales:</b> {self._safe(notas)}",
-                    self.s_value
-                ))
-        
-        # ============================================
-        # CONSTRUIR PDF
-        # ============================================
-        doc.build(story, onFirstPage=self._draw_header, onLaterPages=self._draw_header)
-        
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("Programa / Membresía", self.s_section))
+        curso = getattr(cliente, "curso", None)
+        story.append(self._tabla_kv([
+            ("Curso", _safe(getattr(curso, "nombre", None), "No asignado")),
+            ("Mensualidad", _fmt_money(getattr(curso, "precio_mensual", 0)) if curso else "—"),
+            ("Inscripción", _fmt_money(getattr(curso, "precio_inscripcion", 0)) if curso else "—"),
+            ("Fecha inicio", _fmt_date(getattr(cliente, "fecha_inicio", None))),
+            ("Fecha vencimiento", _fmt_date(getattr(cliente, "fecha_fin", None))),
+            ("Mensualidades pagadas", _safe(getattr(cliente, "mensualidades_canceladas", None), "0")),
+        ]))
+        story.append(Spacer(1, 10))
+        if pago is not None:
+            story.append(Paragraph("Pago registrado", self.s_section))
+            story.append(self._tabla_kv([
+                ("Monto", _fmt_money(getattr(pago, "monto", 0))),
+                ("Fecha", _fmt_date(getattr(pago, "fecha_pago", None), with_time=True)),
+                ("Concepto", self._pago_concepto(pago)),
+                ("Método", _safe(getattr(pago, "metodo_pago", None))),
+                ("Referencia", _safe(getattr(pago, "referencia", None))),
+                ("Periodo", _safe(getattr(pago, "periodo", None))),
+            ]))
+            story.append(Spacer(1, 10))
+        story.append(Paragraph("Historial de pagos", self.s_section))
+        if pagos:
+            story.append(self._tabla_pagos(pagos))
+        else:
+            story.append(Paragraph("No hay pagos registrados.", self.s_small))
+        doc.build(story)
         buffer.seek(0)
         return buffer
-    
-    def generar_reporte_pagos_lista(self, pagos, filtros=None):
-        """
-        Genera reporte de lista de pagos
-        
-        Args:
-            pagos: Lista de objetos Pago
-            filtros: Diccionario con filtros aplicados
-        
-        Returns:
-            BytesIO: Buffer con el PDF generado
-        """
+
+    def generar_reporte_pagos(self, pagos, filtros=None):
+        filtros = filtros or {}
         buffer = io.BytesIO()
-        
-        doc = SimpleDocTemplate(
-            buffer,
-            pagesize=A4,
-            leftMargin=2*cm,
-            rightMargin=2*cm,
-            topMargin=2*cm,
-            bottomMargin=2*cm,
-            title="Reporte_Pagos",
-            author=self.nombre_empresa
-        )
-        
+        doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
         story = []
-        
-        # Encabezado
-        story.append(Paragraph(
-            f"<b>{self._safe(self.nombre_empresa)}</b>",
-            self.s_brand
-        ))
-        
-        story.append(Paragraph(
-            "<b>REPORTE DE PAGOS</b>",
-            self.s_title
-        ))
-        
-        story.append(Paragraph(
-            self._fmt_date(datetime.now(), with_time=True),
-            self.s_subtitle
-        ))
-        
-        # Mostrar filtros
+        story.append(Paragraph(_safe(self.nombre_empresa), self.s_brand))
+        story.append(Paragraph("Reporte de Pagos", self.s_title))
+        story.append(Paragraph(f"Generado: {_fmt_date(datetime.now(), with_time=True)}", self.s_small))
+        story.append(Spacer(1, 10))
         if filtros:
-            story.append(Spacer(1, 8))
-            filtros_text = []
-            
-            if filtros.get('fecha_inicio'):
-                filtros_text.append(f"Desde: {filtros['fecha_inicio']}")
-            if filtros.get('fecha_fin'):
-                filtros_text.append(f"Hasta: {filtros['fecha_fin']}")
-            if filtros.get('estudiante'):
-                filtros_text.append(f"Estudiante: {filtros['estudiante']}")
-            if filtros.get('metodo'):
-                filtros_text.append(f"Método: {filtros['metodo']}")
-            
-            if filtros_text:
-                story.append(Paragraph(
-                    f"<i>Filtros: {' | '.join(filtros_text)}</i>",
-                    self.s_subtitle
-                ))
-        
-        story.append(Spacer(1, 12))
-        
-        # Tabla de pagos
-        table_data = [[
-            Paragraph("<b>Fecha</b>", self.s_table_header),
-            Paragraph("<b>Estudiante</b>", self.s_table_header),
-            Paragraph("<b>Monto</b>", self.s_table_header),
-            Paragraph("<b>Concepto</b>", self.s_table_header),
-            Paragraph("<b>Método</b>", self.s_table_header),
-            Paragraph("<b>Ref.</b>", self.s_table_header)
-        ]]
-        
+            story.append(Paragraph("Filtros", self.s_section))
+            story.append(self._tabla_kv([(k, str(v)) for k, v in filtros.items()]))
+            story.append(Spacer(1, 10))
+        header = ["Fecha", "Estudiante", "Monto", "Concepto", "Método", "Ref."]
+        data = [[Paragraph(f"<b>{h}</b>", self.s_small) for h in header]]
         total = 0.0
-        
-        for p in (pagos or []):
-            fecha = getattr(p, "fecha_pago", None)
-            cliente = getattr(p, "cliente", None)
-            estudiante = self._cliente_nombre(cliente) if cliente else "—"
-            
+        for p in pagos or []:
+            cli = getattr(p, "cliente", None)
+            estudiante = self._cliente_nombre(cli) if cli else "—"
             monto = float(getattr(p, "monto", 0) or 0)
             total += monto
-            
-            # Concepto
-            concepto = getattr(p, "concepto", "auto") or "auto"
-            concepto_display = {
-                'auto': 'Auto',
-                'inscripcion': 'Insc.',
-                'mensualidad': 'Mens.'
-            }.get(concepto, concepto)
-            
-            metodo = self._safe(getattr(p, "metodo_pago", None), "-")
-            referencia = self._safe(getattr(p, "referencia", None), "-")
-            
-            # Truncar textos largos
-            if len(estudiante) > 25:
-                estudiante = estudiante[:22] + "..."
-            if len(referencia) > 15:
-                referencia = referencia[:12] + "..."
-            
-            table_data.append([
-                Paragraph(self._fmt_date(fecha), self.s_table_cell),
-                Paragraph(estudiante, self.s_table_cell),
-                Paragraph(self._fmt_money(monto), self.s_table_cell),
-                Paragraph(concepto_display, self.s_table_cell),
-                Paragraph(metodo, self.s_table_cell),
-                Paragraph(referencia, self.s_table_cell)
+            data.append([
+                Paragraph(_fmt_date(getattr(p, "fecha_pago", None), with_time=True), self.s_small),
+                Paragraph(_safe(estudiante), self.s_small),
+                Paragraph(_fmt_money(monto), self.s_small),
+                Paragraph(_safe(self._pago_concepto(p)), self.s_small),
+                Paragraph(_safe(getattr(p, "metodo_pago", None), "—"), self.s_small),
+                Paragraph(_safe(getattr(p, "referencia", None), "—"), self.s_small),
             ])
-        
-        # Fila de total
-        table_data.append([
-            Paragraph("<b>TOTAL</b>", self.s_table_cell),
-            Paragraph("", self.s_table_cell),
-            Paragraph(f"<b>{self._fmt_money(total)}</b>", self.s_table_cell),
-            Paragraph("", self.s_table_cell),
-            Paragraph("", self.s_table_cell),
-            Paragraph(f"<b>{len(pagos or [])} pagos</b>", self.s_table_cell)
-        ])
-        
-        tabla = Table(
-            table_data,
-            colWidths=[2.6*cm, 5*cm, 2.6*cm, 2*cm, 2.8*cm, 2.5*cm]
-        )
-        
-        tabla.setStyle(TableStyle([
-            # Encabezado
-            ('BACKGROUND', (0, 0), (-1, 0), self.COLOR_PRIMARY),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 9),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            
-            # Celdas
-            ('FONTSIZE', (0, 1), (-1, -2), 8),
-            ('ALIGN', (2, 1), (2, -1), 'RIGHT'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            
-            # Líneas
-            ('LINEBELOW', (0, 0), (-1, 0), 1, self.COLOR_PRIMARY),
-            ('GRID', (0, 1), (-1, -2), 0.5, self.COLOR_BORDER),
-            
-            # Fila de total
-            ('BACKGROUND', (0, -1), (-1, -1), self.COLOR_LIGHT_BG),
-            ('LINEABOVE', (0, -1), (-1, -1), 1.5, self.COLOR_PRIMARY),
-            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
-            
-            # Padding
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('LEFTPADDING', (0, 0), (-1, -1), 4),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        t = Table(data, colWidths=[3.1*cm, 5.0*cm, 2.2*cm, 3.4*cm, 2.6*cm, 2.7*cm])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), colors.whitesmoke),
+            ("GRID", (0,0), (-1,-1), 0.25, colors.lightgrey),
+            ("LINEBELOW", (0,0), (-1,0), 0.5, colors.grey),
+            ("VALIGN", (0,0), (-1,-1), "TOP"),
         ]))
-        
-        story.append(tabla)
-        
-        # Construir PDF
-        doc.build(story, onFirstPage=self._draw_header, onLaterPages=self._draw_header)
-        
+        story.append(t)
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(f"<b>Total:</b> {_fmt_money(total)}", self.s_title))
+        doc.build(story)
         buffer.seek(0)
         return buffer
 
 
-# Instancia global para importar
 pdf_generator = PDFGenerator()

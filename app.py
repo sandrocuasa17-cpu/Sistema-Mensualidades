@@ -54,22 +54,15 @@ migrate = Migrate(app, db)
 # Inicializar BackupManager con manejo inteligente de PostgreSQL/SQLite
 db_uri = app.config['SQLALCHEMY_DATABASE_URI']
 
-if 'sqlite:///' in db_uri:
-    # ✅ SQLite: Backups habilitados
-    db_path_relative = db_uri.replace('sqlite:///', '')
-    
-    if not db_path_relative.startswith('instance/'):
-        db_path = os.path.join('instance', os.path.basename(db_path_relative))
-    else:
-        db_path = db_path_relative
-    
+if db_uri.startswith('sqlite:///'):
+    # ✅ SQLite (incluye rutas absolutas como /var/data/...)
+    db_path = db_uri.replace('sqlite:///', '')
     backup_manager = BackupManager(app, db_path)
     app.logger.info(f"📦 BackupManager inicializado (SQLite): {db_path}")
-    
 else:
-    # ✅ PostgreSQL: Backups deshabilitados pero manager disponible
+    # ✅ PostgreSQL u otros
     backup_manager = BackupManager(app, db_path=None)
-    app.logger.info(f"📦 BackupManager inicializado (PostgreSQL - sin backups)")
+    app.logger.info("📦 BackupManager inicializado (PostgreSQL - sin backups)")
 
 # Importar servicio de correos
 from email_service import (
@@ -82,12 +75,30 @@ from email_service import (
 )
 
 
-# ✅ Context processor para templates
+# ============================================
+# CONTEXT PROCESSORS - AÑADIR EN app.py línea 91
+# ============================================
+
 @app.context_processor
 def inject_now():
     """Inyecta la función 'now' en todos los templates"""
     return {
         'now': datetime.now
+    }
+
+# ✅ AGREGAR ESTE NUEVO CONTEXT PROCESSOR
+@app.context_processor
+def inject_utility_functions():
+    """Inyecta funciones útiles en todos los templates"""
+    return {
+        'abs': abs,           # Función abs() para valores absolutos
+        'min': min,           # Función min()
+        'max': max,           # Función max()
+        'round': round,       # Función round()
+        'len': len,           # Función len()
+        'int': int,           # Conversión a entero
+        'float': float,       # Conversión a float
+        'str': str            # Conversión a string
     }
 
 # Importar license manager
@@ -149,8 +160,8 @@ class Configuracion(db.Model):
 
 class Curso(db.Model):
     """
-    Cursos con duración INDEFINIDA
-    ✅ CAMBIO: Se eliminó duracion_meses (ahora es indefinido)
+    Cursos con duración FLEXIBLE
+    ✅ Permite pago mensual o pago único completo
     """
     __tablename__ = 'curso'
     
@@ -159,7 +170,13 @@ class Curso(db.Model):
     descripcion = db.Column(db.Text)
     precio_mensual = db.Column(db.Float, nullable=False)
     precio_inscripcion = db.Column(db.Float, default=0)
-    # ❌ ELIMINADO: duracion_meses (ahora indefinido)
+    
+    # ✅ Duración del curso
+    duracion_meses = db.Column(db.Integer, nullable=True)  # NULL = indefinido, número = definido
+    
+    # ✅ Pago único
+    permite_pago_unico = db.Column(db.Boolean, default=False)  # Si permite pagar todo de una vez
+    
     activo = db.Column(db.Boolean, default=True, index=True)
     fecha_creacion = db.Column(db.DateTime, default=datetime.now)
     
@@ -168,6 +185,40 @@ class Curso(db.Model):
     
     def __repr__(self):
         return f'<Curso {self.nombre}>'
+    
+    # ========== PROPIEDADES CALCULADAS ==========
+    
+    @property
+    def es_indefinido(self):
+        """True si el curso no tiene duración definida"""
+        return self.duracion_meses is None or self.duracion_meses <= 0
+    
+    @property
+    def duracion_texto(self):
+        """Texto descriptivo de la duración"""
+        if self.es_indefinido:
+            return "Indefinido"
+        return f"{self.duracion_meses} mes{'es' if self.duracion_meses != 1 else ''}"
+    
+    @property
+    def costo_total_mensualidades(self):
+        """Costo total de todas las mensualidades (solo si es definido)"""
+        if self.es_indefinido:
+            return None
+        return self.precio_mensual * self.duracion_meses
+    
+    @property
+    def precio_total_curso(self):
+        """
+        Precio total del curso completo (inscripción + todas las mensualidades)
+        Solo aplica para cursos con duración definida
+        """
+        if self.es_indefinido:
+            return None
+        
+        inscripcion = float(self.precio_inscripcion or 0)
+        mensualidades = float(self.costo_total_mensualidades or 0)
+        return inscripcion + mensualidades
 
 
 class Cliente(db.Model):
@@ -195,7 +246,12 @@ class Cliente(db.Model):
     plan_id = db.Column(db.Integer, db.ForeignKey('plan.id'), index=True)  # Legacy
     
     # ===================================
-    # ✅ NUEVO SISTEMA DE TRACKING DE PAGOS
+    # ✅ NUEVO: MODALIDAD DE PAGO
+    # ===================================
+    modalidad_pago = db.Column(db.String(10), default='mensual')  # 'mensual' o 'unico'
+    
+    # ===================================
+    # ✅ SISTEMA DE TRACKING DE PAGOS
     # ===================================
     # INSCRIPCIÓN (pago único)
     abono_inscripcion = db.Column(db.Float, default=0)  # Cuánto ha pagado de inscripción
@@ -221,8 +277,6 @@ class Cliente(db.Model):
     notas = db.Column(db.Text)
     observaciones_inscripcion = db.Column(db.Text)
     
-    # ❌ ELIMINADO: valor_inscripcion (se toma del curso automáticamente)
-    
     # Relaciones
     pagos = db.relationship('Pago', backref='cliente', lazy=True, cascade='all, delete-orphan')
 
@@ -237,6 +291,11 @@ class Cliente(db.Model):
     def nombre_completo(self):
         """Nombre completo del estudiante"""
         return f"{self.nombre} {self.apellido}"
+    
+    @property
+    def es_pago_unico(self):
+        """True si el estudiante eligió pago único"""
+        return self.modalidad_pago == 'unico'
     
     @property
     def inscripcion_pendiente(self):
@@ -370,15 +429,18 @@ class Cliente(db.Model):
     def total_programa(self):
         """
         Total a pagar por TODO el programa
-        ✅ NOTA: Como la duración es indefinida, esto es solo referencial
+        ✅ Si es pago único, retorna el total del curso
         """
-        total = 0.0
-
-        # Inscripción
-        if self.curso:
-            total += float(self.curso.precio_inscripcion or 0)
-
-        return round(total, 2)
+        if not self.curso:
+            return 0
+        
+        if self.es_pago_unico and not self.curso.es_indefinido:
+            # Pago único: inscripción + todas las mensualidades
+            return float(self.curso.precio_inscripcion or 0) + \
+                   (float(self.curso.precio_mensual) * self.curso.duracion_meses)
+        
+        # Pago mensual: solo inscripción (mensualidades son indefinidas)
+        return float(self.curso.precio_inscripcion or 0)
 
     @property
     def total_pagado(self):
@@ -388,9 +450,13 @@ class Cliente(db.Model):
     @property
     def saldo_pendiente(self):
         """
-        Saldo pendiente SOLO de inscripción
-        (Las mensualidades son indefinidas, no tienen "saldo pendiente" fijo)
+        Saldo pendiente según modalidad:
+        - Pago único: Total del curso - Total pagado
+        - Pago mensual: Solo inscripción pendiente
         """
+        if self.es_pago_unico and not self.curso.es_indefinido:
+            return max(0, self.total_programa - self.total_pagado)
+        
         return round(self.inscripcion_pendiente, 2)
 
 
@@ -623,7 +689,35 @@ def _recalcular_cobertura_cliente(cliente):
                     f"✅ {meses_completos} mensualidad(es) - concepto específico. "
                     f"Carry: ${carry_mensualidades:.2f}"
                 )
-    
+        # ====================================
+        # ✅ CONCEPTO: PAGO ÚNICO COMPLETO
+        # ====================================
+        elif concepto == 'unico':
+            # Este es un pago único que cubre TODO el curso
+            # Distribuir: primero inscripción, luego mensualidades
+            
+            # PASO 1: Cubrir inscripción completa
+            if precio_inscripcion > 0:
+                abono_inscripcion_acumulado = precio_inscripcion
+                saldo_disponible -= precio_inscripcion
+                app.logger.info(f"✅ Inscripción COMPLETA (pago único): ${precio_inscripcion:.2f}")
+            
+            # PASO 2: El resto son mensualidades completas
+            if saldo_disponible > 0:
+                meses_completos = int(saldo_disponible // precio_mensual)
+                
+                if meses_completos > 0:
+                    total_meses += meses_completos
+                    monto_mensualidades = meses_completos * precio_mensual
+                    saldo_disponible -= monto_mensualidades
+                    
+                    app.logger.info(
+                        f"✅ {meses_completos} mensualidades COMPLETAS (pago único): ${monto_mensualidades:.2f}"
+                    )
+                
+                # Si queda algo, es carry
+                if saldo_disponible > 0:
+                    carry_mensualidades = round(saldo_disponible, 2)
     # ===================================
     # 4. ACTUALIZAR CLIENTE
     # ===================================
@@ -787,71 +881,215 @@ def cursos():
 @app.route('/cursos/nuevo', methods=['GET', 'POST'])
 @requiere_licencia_y_auth
 def curso_nuevo():
-    """Crear nuevo curso (sin duración)"""
+    """Crear nuevo curso con duración flexible y pago único"""
     if request.method == 'POST':
         try:
+            # ===================================
+            # 1. VALIDAR DATOS BÁSICOS
+            # ===================================
+            nombre = request.form.get('nombre', '').strip()
+            if not nombre:
+                flash('❌ El nombre del curso es obligatorio', 'danger')
+                return redirect(url_for('curso_nuevo'))
+            
             precio_mensual = float(request.form.get('precio_mensual', 0))
             precio_inscripcion = float(request.form.get('precio_inscripcion', 0))
 
             if precio_mensual <= 0:
-                flash('El precio mensual debe ser mayor a 0', 'danger')
+                flash('❌ El precio mensual debe ser mayor a 0', 'danger')
                 return redirect(url_for('curso_nuevo'))
 
+            # ===================================
+            # 2. PROCESAR DURACIÓN
+            # ===================================
+            tipo_duracion = request.form.get('tipo_duracion', 'indefinido')
+            
+            if tipo_duracion == 'definido':
+                # Duración definida en meses
+                duracion_meses = request.form.get('duracion_meses', '').strip()
+                if not duracion_meses:
+                    flash('❌ Debes especificar la duración en meses', 'danger')
+                    return redirect(url_for('curso_nuevo'))
+                
+                try:
+                    duracion_meses = int(duracion_meses)
+                    if duracion_meses < 1 or duracion_meses > 60:
+                        flash('❌ La duración debe estar entre 1 y 60 meses', 'danger')
+                        return redirect(url_for('curso_nuevo'))
+                except ValueError:
+                    flash('❌ La duración debe ser un número válido', 'danger')
+                    return redirect(url_for('curso_nuevo'))
+            else:
+                # Duración indefinida
+                duracion_meses = None
+
+            # ===================================
+            # 3. PROCESAR PAGO ÚNICO
+            # ===================================
+            permite_pago_unico = 'permite_pago_unico' in request.form
+            
+            # Validar: Solo permitir pago único en cursos con duración definida
+            if permite_pago_unico and duracion_meses is None:
+                flash('⚠️ El pago único solo está disponible para cursos con duración definida', 'warning')
+                permite_pago_unico = False
+
+            # ===================================
+            # 4. CREAR CURSO
+            # ===================================
             curso = Curso(
-                nombre=request.form['nombre'].strip(),
+                nombre=nombre,
                 descripcion=request.form.get('descripcion', '').strip() or None,
                 precio_mensual=precio_mensual,
-                precio_inscripcion=precio_inscripcion
+                precio_inscripcion=precio_inscripcion,
+                duracion_meses=duracion_meses,
+                permite_pago_unico=permite_pago_unico,
+                activo=True
             )
 
             db.session.add(curso)
             db.session.commit()
 
-            app.logger.info(f'✅ Curso creado: {curso.nombre}')
-            flash(f'✅ Curso {curso.nombre} creado exitosamente', 'success')
+            # ===================================
+            # 5. LOG Y MENSAJE DE ÉXITO
+            # ===================================
+            tipo_curso = "indefinido" if duracion_meses is None else f"{duracion_meses} meses"
+            pago_unico_txt = "Sí" if permite_pago_unico else "No"
+            
+            app.logger.info(
+                f'✅ Curso creado: {curso.nombre} | '
+                f'Duración: {tipo_curso} | '
+                f'Mensual: ${precio_mensual:.2f} | '
+                f'Inscripción: ${precio_inscripcion:.2f} | '
+                f'Pago único: {pago_unico_txt}'
+            )
+            
+            flash(f'✅ Curso "{curso.nombre}" creado exitosamente', 'success')
             return redirect(url_for('cursos'))
 
+        except ValueError as e:
+            db.session.rollback()
+            app.logger.error(f'❌ Error de validación: {e}')
+            flash('❌ Error en los datos ingresados. Verifica los precios.', 'danger')
+            return redirect(url_for('curso_nuevo'))
+            
         except Exception as e:
             db.session.rollback()
             app.logger.error(f'❌ Error creando curso: {e}')
-            flash('Error al crear el curso', 'danger')
+            import traceback
+            app.logger.error(traceback.format_exc())
+            flash('❌ Error al crear el curso', 'danger')
+            return redirect(url_for('curso_nuevo'))
 
+    # ===================================
+    # GET: MOSTRAR FORMULARIO
+    # ===================================
     return render_template('cursos/formulario.html', curso=None)
-
 
 @app.route('/cursos/<int:id>/editar', methods=['GET', 'POST'])
 @requiere_licencia_y_auth
 def curso_editar(id):
+    """Editar curso existente con duración flexible y pago único"""
     curso = Curso.query.get_or_404(id)
 
     if request.method == 'POST':
         try:
+            # ===================================
+            # 1. VALIDAR DATOS BÁSICOS
+            # ===================================
+            nombre = request.form.get('nombre', '').strip()
+            if not nombre:
+                flash('❌ El nombre del curso es obligatorio', 'danger')
+                return redirect(url_for('curso_editar', id=id))
+            
             precio_mensual = float(request.form.get('precio_mensual', 0))
             precio_inscripcion = float(request.form.get('precio_inscripcion', 0))
 
             if precio_mensual <= 0:
-                flash('El precio mensual debe ser mayor a 0', 'danger')
+                flash('❌ El precio mensual debe ser mayor a 0', 'danger')
                 return redirect(url_for('curso_editar', id=id))
 
-            curso.nombre = request.form['nombre'].strip()
+            # ===================================
+            # 2. PROCESAR DURACIÓN
+            # ===================================
+            tipo_duracion = request.form.get('tipo_duracion', 'indefinido')
+            
+            if tipo_duracion == 'definido':
+                # Duración definida en meses
+                duracion_meses = request.form.get('duracion_meses', '').strip()
+                if not duracion_meses:
+                    flash('❌ Debes especificar la duración en meses', 'danger')
+                    return redirect(url_for('curso_editar', id=id))
+                
+                try:
+                    duracion_meses = int(duracion_meses)
+                    if duracion_meses < 1 or duracion_meses > 60:
+                        flash('❌ La duración debe estar entre 1 y 60 meses', 'danger')
+                        return redirect(url_for('curso_editar', id=id))
+                except ValueError:
+                    flash('❌ La duración debe ser un número válido', 'danger')
+                    return redirect(url_for('curso_editar', id=id))
+            else:
+                # Duración indefinida
+                duracion_meses = None
+
+            # ===================================
+            # 3. PROCESAR PAGO ÚNICO
+            # ===================================
+            permite_pago_unico = 'permite_pago_unico' in request.form
+            
+            # Validar: Solo permitir pago único en cursos con duración definida
+            if permite_pago_unico and duracion_meses is None:
+                flash('⚠️ El pago único solo está disponible para cursos con duración definida', 'warning')
+                permite_pago_unico = False
+
+            # ===================================
+            # 4. ACTUALIZAR CURSO
+            # ===================================
+            curso.nombre = nombre
             curso.descripcion = request.form.get('descripcion', '').strip() or None
             curso.precio_mensual = precio_mensual
             curso.precio_inscripcion = precio_inscripcion
+            curso.duracion_meses = duracion_meses
+            curso.permite_pago_unico = permite_pago_unico
             curso.activo = 'activo' in request.form
 
             db.session.commit()
 
-            app.logger.info(f'✅ Curso actualizado: {curso.nombre}')
-            flash(f'✅ Curso {curso.nombre} actualizado exitosamente', 'success')
+            # ===================================
+            # 5. LOG Y MENSAJE DE ÉXITO
+            # ===================================
+            tipo_curso = "indefinido" if duracion_meses is None else f"{duracion_meses} meses"
+            pago_unico_txt = "Sí" if permite_pago_unico else "No"
+            
+            app.logger.info(
+                f'✅ Curso actualizado: {curso.nombre} | '
+                f'Duración: {tipo_curso} | '
+                f'Mensual: ${precio_mensual:.2f} | '
+                f'Inscripción: ${precio_inscripcion:.2f} | '
+                f'Pago único: {pago_unico_txt}'
+            )
+            
+            flash(f'✅ Curso "{curso.nombre}" actualizado exitosamente', 'success')
             return redirect(url_for('cursos'))
 
+        except ValueError as e:
+            db.session.rollback()
+            app.logger.error(f'❌ Error de validación: {e}')
+            flash('❌ Error en los datos ingresados. Verifica los precios.', 'danger')
+            return redirect(url_for('curso_editar', id=id))
+            
         except Exception as e:
             db.session.rollback()
             app.logger.error(f'❌ Error actualizando curso {id}: {e}')
-            flash('Error al actualizar el curso', 'danger')
+            import traceback
+            app.logger.error(traceback.format_exc())
+            flash('❌ Error al actualizar el curso', 'danger')
+            return redirect(url_for('curso_editar', id=id))
 
+    # ===================================
+    # GET: MOSTRAR FORMULARIO
+    # ===================================
     return render_template('cursos/formulario.html', curso=curso)
-
 
 @app.route('/cursos/<int:id>/eliminar', methods=['POST'])
 @requiere_licencia_y_auth
@@ -1550,11 +1788,10 @@ def clientes():
 # ============================================
 # RUTAS DE CLIENTES - INSCRIPCIÓN MEJORADA
 # ============================================
-
 @app.route('/clientes/nuevo', methods=['GET', 'POST'])
 @requiere_licencia_y_auth
 def cliente_nuevo():
-    """Inscribir nuevo estudiante (inscripción automática desde curso)"""
+    """Inscribir nuevo estudiante con modalidad de pago (mensual o único)"""
     if request.method == 'POST':
         try:
             # ===================================
@@ -1599,7 +1836,25 @@ def cliente_nuevo():
                 return redirect(url_for('cliente_nuevo'))
             
             # ===================================
-            # 5. PROCESAR FECHAS
+            # 5. ✅ CAPTURAR MODALIDAD DE PAGO
+            # ===================================
+            modalidad_pago = request.form.get('modalidad_pago', 'mensual').strip()
+            
+            # Validar que la modalidad sea correcta
+            if modalidad_pago not in ['mensual', 'unico']:
+                modalidad_pago = 'mensual'
+            
+            # Validar que el pago único esté disponible
+            if modalidad_pago == 'unico':
+                if curso.es_indefinido:
+                    flash('⚠️ El pago único no está disponible para cursos indefinidos', 'warning')
+                    modalidad_pago = 'mensual'
+                elif not curso.permite_pago_unico:
+                    flash('⚠️ Este curso no permite pago único', 'warning')
+                    modalidad_pago = 'mensual'
+            
+            # ===================================
+            # 6. PROCESAR FECHAS
             # ===================================
             fecha_registro_str = request.form.get('fecha_registro')
             fecha_registro = datetime.strptime(fecha_registro_str, '%Y-%m-%d') if fecha_registro_str else datetime.now()
@@ -1614,12 +1869,33 @@ def cliente_nuevo():
             except:
                 flash('❌ Formato de fecha inválido', 'danger')
                 return redirect(url_for('cliente_nuevo'))
-            
             # ===================================
-            # 6. CALCULAR FECHA DE VENCIMIENTO
+            # 7. ✅ PROCESAR MENSUALIDADES Y PAGO ÚNICO
             # ===================================
             mensualidades_canceladas = int(request.form.get('mensualidades_canceladas', 0))
             
+            # Verificar si ya realizó el pago único
+            pago_realizado = 'pago_realizado' in request.form
+            
+            # Si eligió pago único Y el curso lo permite Y ya pagó
+            if modalidad_pago == 'unico' and curso.permite_pago_unico and not curso.es_indefinido and pago_realizado:
+                # ✅ CORRECTO: Solo asigna cobertura si YA PAGÓ
+                mensualidades_canceladas = curso.duracion_meses
+                
+                app.logger.info(
+                    f'💰 Pago único confirmado: {mensualidades_canceladas} meses del curso '
+                    f'"{curso.nombre}" - Pago ya realizado'
+                )
+            elif modalidad_pago == 'unico' and not pago_realizado:
+                # ⚠️ Eligió pago único pero NO ha pagado aún
+                mensualidades_canceladas = 0
+                app.logger.info(
+                    f'⏳ Pago único seleccionado pero pendiente de pago - Sin cobertura inicial'
+                )
+            
+            # ===================================
+            # 8. CALCULAR FECHA DE VENCIMIENTO
+            # ===================================
             if mensualidades_canceladas == 0:
                 fecha_fin = fecha_inicio_clases
             else:
@@ -1627,12 +1903,7 @@ def cliente_nuevo():
                 fecha_fin = fecha_inicio_clases + timedelta(days=dias_cubiertos)
             
             # ===================================
-            # 7. ✅ VALOR DE INSCRIPCIÓN AUTOMÁTICO DESDE CURSO
-            # ===================================
-            valor_inscripcion = curso.precio_inscripcion  # ✅ Se toma del curso automáticamente
-            
-            # ===================================
-            # 8. CREAR ESTUDIANTE
+            # 9. CREAR ESTUDIANTE
             # ===================================
             cliente = Cliente(
                 nombre=request.form['nombre'].strip(),
@@ -1643,6 +1914,7 @@ def cliente_nuevo():
                 direccion=request.form.get('direccion', '').strip() or None,
                 curso_id=curso_id,
                 plan_id=request.form.get('plan_id') or None,
+                modalidad_pago=modalidad_pago,  # ✅ GUARDAR MODALIDAD
                 fecha_registro=fecha_registro,
                 fecha_inicio_clases=fecha_inicio_clases,
                 fecha_inicio=fecha_registro,
@@ -1654,20 +1926,96 @@ def cliente_nuevo():
             )
             
             db.session.add(cliente)
+            db.session.flush()  # Para obtener el ID
+            
+           # ===================================
+            # 10. ✅ REGISTRAR PAGO ÚNICO (SI YA SE REALIZÓ)
+            # ===================================
+            pago_registrado = False
+            
+            if modalidad_pago == 'unico' and pago_realizado and mensualidades_canceladas > 0:
+                # Calcular monto total del curso
+                monto_inscripcion = float(curso.precio_inscripcion or 0)
+                monto_mensualidades = float(curso.precio_mensual) * curso.duracion_meses
+                monto_total = monto_inscripcion + monto_mensualidades
+                
+                # Obtener datos del pago del formulario
+                metodo_pago = request.form.get('metodo_pago_inicial', '').strip() or 'No especificado'
+                referencia = request.form.get('referencia_inicial', '').strip() or f'PAGO-UNICO-{datetime.now().strftime("%Y%m%d%H%M%S")}'
+                notas_pago = request.form.get('notas_pago_inicial', '').strip() or f'Pago único del curso completo: {curso.nombre} ({curso.duracion_meses} meses)'
+                
+                # ✅ Crear registro de pago único CON DATOS REALES
+                pago_unico = Pago(
+                    cliente_id=cliente.id,
+                    monto=monto_total,
+                    concepto='unico',
+                    metodo_pago=metodo_pago,
+                    referencia=referencia,
+                    notas=notas_pago,
+                    periodo=f'{fecha_inicio_clases.strftime("%m/%Y")} - {fecha_fin.strftime("%m/%Y")}'
+                )
+                
+                db.session.add(pago_unico)
+                
+                # Marcar inscripción como pagada
+                cliente.abono_inscripcion = monto_inscripcion
+                
+                pago_registrado = True
+                
+                app.logger.info(
+                    f'💳 Pago único registrado: ${monto_total:.2f} '
+                    f'(Inscripción: ${monto_inscripcion:.2f} + '
+                    f'{curso.duracion_meses} mensualidades: ${monto_mensualidades:.2f}) '
+                    f'Método: {metodo_pago}'
+                )
+                
+                db.session.add(pago_unico)
+                
+                # Marcar inscripción como pagada
+                cliente.abono_inscripcion = monto_inscripcion
+                
+                app.logger.info(
+                    f'💳 Pago único registrado automáticamente: ${monto_total:.2f} '
+                    f'(Inscripción: ${monto_inscripcion:.2f} + '
+                    f'{curso.duracion_meses} mensualidades: ${monto_mensualidades:.2f})'
+                )
+            
             db.session.commit()
             
+           # ===================================
+            # 11. LOG Y MENSAJE DE ÉXITO
             # ===================================
-            # 9. LOG Y MENSAJE DE ÉXITO
-            # ===================================
+            modalidad_texto = "Pago Único" if modalidad_pago == 'unico' else "Pago Mensual"
+            
             app.logger.info(
                 f'✅ Inscripción: {cliente.nombre_completo} - '
                 f'Cédula: {cliente.cedula or "N/A"} - '
                 f'Curso: {curso.nombre} - '
-                f'Inscripción: ${valor_inscripcion:.2f} - '
-                f'Cobertura: {mensualidades_canceladas} meses'
+                f'Modalidad: {modalidad_texto} - '
+                f'Cobertura: {mensualidades_canceladas} meses - '
+                f'Pago registrado: {"Sí" if pago_registrado else "No"}'
             )
             
-            flash(f'✅ ¡{cliente.nombre_completo} inscrito exitosamente!', 'success')
+            mensaje_flash = f'✅ ¡{cliente.nombre_completo} inscrito exitosamente!\n'
+            mensaje_flash += f'📋 Modalidad: {modalidad_texto}\n'
+            
+            if modalidad_pago == 'unico':
+                monto_total = curso.precio_inscripcion + (curso.precio_mensual * curso.duracion_meses)
+                
+                if pago_registrado:
+                    # ✅ Ya pagó
+                    mensaje_flash += f'💰 Pago registrado: ${monto_total:.2f}\n'
+                    mensaje_flash += f'📅 Cobertura: {curso.duracion_meses} meses\n'
+                    mensaje_flash += f'🗓️ Vence: {fecha_fin.strftime("%d/%m/%Y")}'
+                else:
+                    # ⏳ Pendiente de pago
+                    mensaje_flash += f'⏳ Pago pendiente: ${monto_total:.2f}\n'
+                    mensaje_flash += f'⚠️ Sin cobertura hasta registrar el pago\n'
+                    mensaje_flash += f'📋 Registra el pago en "Registrar Pago"'
+            else:
+                mensaje_flash += f'📅 Inicia: {fecha_inicio_clases.strftime("%d/%m/%Y")}'
+            
+            flash(mensaje_flash, 'success')
             return redirect(url_for('cliente_detalle', id=cliente.id))
             
         except Exception as e:
@@ -2024,21 +2372,8 @@ def pagos_estudiante_pdf(cliente_id):
 def pago_nuevo(cliente_id):
     """
     Registrar un pago con sistema de abonos inteligente
-    
-    CARACTERÍSTICAS:
-    ✅ Permite abonos parciales a inscripción
-    ✅ Permite abonos parciales a mensualidades
-    ✅ Acumula pagos hasta completar conceptos
-    ✅ Recalcula cobertura automáticamente
-    ✅ Muestra desglose detallado en tiempo real
-    
-    CONCEPTOS DE PAGO:
-    - 'auto': Distribución automática (primero inscripción, luego mensualidades)
-    - 'inscripcion': Solo para inscripción
-    - 'mensualidad': Solo para mensualidades
+    ✅ ENVÍA CORREO PARA TODOS LOS PAGOS (normales y únicos)
     """
-    
-    
     cliente = Cliente.query.get_or_404(cliente_id)
 
     if request.method == 'POST':
@@ -2187,7 +2522,7 @@ def pago_nuevo(cliente_id):
             pago = Pago(
                 cliente_id=cliente_id,
                 monto=monto,
-                concepto=concepto,  # ✅ NUEVO CAMPO
+                concepto=concepto,
                 metodo_pago=(request.form.get('metodo_pago', '') or '').strip() or None,
                 referencia=(request.form.get('referencia', '') or '').strip() or None,
                 notas=(request.form.get('notas', '') or '').strip() or None,
@@ -2197,13 +2532,54 @@ def pago_nuevo(cliente_id):
             db.session.flush()
 
             # ===================================
-            # 6. RECALCULAR COBERTURA
+            # 5.5 ✅ DETECTAR SI ES PAGO ÚNICO COMPLETO
             # ===================================
+            es_pago_unico_completo = False
+            
+            if cliente.modalidad_pago == 'unico' and cliente.curso and not cliente.curso.es_indefinido:
+                monto_curso_completo = float(cliente.curso.precio_inscripcion or 0) + \
+                                      (float(cliente.curso.precio_mensual) * cliente.curso.duracion_meses)
+                
+                if abs(monto - monto_curso_completo) < 0.01 and cliente.mensualidades_canceladas == 0:
+                    es_pago_unico_completo = True
+                    pago.concepto = 'unico'
+                    app.logger.info(f'💰 Pago único completo detectado: ${monto:.2f}')
+
+            # ===================================
+            # 6. RECALCULAR COBERTURA (SIEMPRE)
+            # ===================================
+            db.session.flush()
             resultado = _recalcular_cobertura_cliente(cliente)
             db.session.commit()
 
             # ===================================
-            # 7. PREPARAR MENSAJE DE CONFIRMACIÓN
+            # 7. 🔥 ENVIAR CORREO (PARA TODOS LOS PAGOS)
+            # ===================================
+            correo_enviado = False
+            error_correo = None
+            
+            try:
+                if app.config.get('ENABLE_EMAIL_NOTIFICATIONS', False):
+                    from email_service import enviar_confirmacion_pago
+                    
+                    app.logger.info(f'📧 Intentando enviar correo a {cliente.email}...')
+                    correo_enviado = enviar_confirmacion_pago(cliente, pago)
+                    
+                    if correo_enviado:
+                        app.logger.info(f'✅ Correo enviado exitosamente a {cliente.email}')
+                    else:
+                        app.logger.warning(f'⚠️ No se pudo enviar correo a {cliente.email}')
+                else:
+                    app.logger.info('ℹ️ Notificaciones por correo deshabilitadas')
+                    
+            except Exception as e:
+                error_correo = str(e)
+                app.logger.error(f'❌ Error enviando correo: {e}')
+                import traceback
+                app.logger.error(traceback.format_exc())
+
+            # ===================================
+            # 8. PREPARAR MENSAJE DE CONFIRMACIÓN
             # ===================================
             
             # Estado DESPUÉS del pago
@@ -2212,7 +2588,31 @@ def pago_nuevo(cliente_id):
             meses_ganados = max(0, meses_despues - meses_antes)
             carry_despues = resultado.get("carry", 0)
             
-            # Construir mensaje
+            # ✅ Mensaje especial para pago único completo
+            if es_pago_unico_completo:
+                mensaje_parts = [
+                    f'🎉 ¡PAGO ÚNICO COMPLETO REGISTRADO!',
+                    f'\n💰 Monto: ${monto:.2f}',
+                    f'\n\n📚 Curso: {cliente.curso.nombre}',
+                    f'\n📅 Cobertura total: {cliente.curso.duracion_meses} meses',
+                    f'\n🗓️ Vencimiento: {cliente.fecha_fin.strftime("%d/%m/%Y") if cliente.fecha_fin else "N/A"}',
+                    f'\n\n✅ Inscripción: COMPLETADA',
+                    f'\n✅ Mensualidades: {cliente.curso.duracion_meses} meses PAGADOS'
+                ]
+                
+                # Añadir info de correo
+                if correo_enviado:
+                    mensaje_parts.append(f'\n\n📧 Confirmación enviada a {cliente.email}')
+                elif error_correo:
+                    mensaje_parts.append(f'\n\n⚠️ Error enviando correo: {error_correo}')
+                
+                mensaje_flash = ''.join(mensaje_parts)
+                flash(mensaje_flash, 'success')
+                
+                app.logger.info(f'🎉 Pago único completo procesado para {cliente.nombre_completo}')
+                return redirect(url_for('cliente_detalle', id=cliente_id))
+            
+            # Construir mensaje normal
             mensaje_parts = [f'✅ Pago de ${monto:.2f} registrado exitosamente']
             
             # Concepto usado
@@ -2254,22 +2654,18 @@ def pago_nuevo(cliente_id):
                 mensaje_parts.append(f"\n\n💰 Crédito acumulado: ${carry_despues:.2f}")
                 mensaje_parts.append(f"   Faltan ${faltante:.2f} para completar 1 mensualidad")
 
-            mensaje_flash = ''.join(mensaje_parts)
-
-            # ===================================
-            # 8. ENVIAR CORREO (OPCIONAL)
-            # ===================================
-            correo_enviado = False
-            try:
-                if app.config.get('ENABLE_EMAIL_NOTIFICATIONS', False):
-                    from email_service import enviar_confirmacion_pago
-                    correo_enviado = enviar_confirmacion_pago(cliente, pago)
-            except Exception as e:
-                app.logger.error(f'❌ Error enviando correo: {e}')
-
+            # 🔥 IMPORTANTE: Añadir estado del correo al mensaje
             if correo_enviado:
-                mensaje_flash += f'\n\n✉️ Correo enviado a {cliente.email}'
-            
+                mensaje_parts.append(f'\n\n📧 Confirmación enviada a {cliente.email}')
+            elif app.config.get('ENABLE_EMAIL_NOTIFICATIONS', False):
+                if error_correo:
+                    mensaje_parts.append(f'\n\n⚠️ No se pudo enviar correo: {error_correo}')
+                else:
+                    mensaje_parts.append(f'\n\n⚠️ No se pudo enviar correo a {cliente.email}')
+            else:
+                mensaje_parts.append('\n\nℹ️ Correos deshabilitados (actívalos en Configuración)')
+
+            mensaje_flash = ''.join(mensaje_parts)
             flash(mensaje_flash, 'success')
             
             # Log detallado
@@ -2285,6 +2681,7 @@ def pago_nuevo(cliente_id):
                - Mensualidades: {meses_despues} ({'+' + str(meses_ganados) if meses_ganados > 0 else 'sin cambio'})
                - Carry: ${carry_despues:.2f}
             🗓️ Vencimiento: {cliente.fecha_fin.strftime('%d/%m/%Y') if cliente.fecha_fin else 'N/A'}
+            📧 Correo: {'✅ Enviado' if correo_enviado else '❌ No enviado'}
             {'='*60}
             """)
             
@@ -2304,7 +2701,28 @@ def pago_nuevo(cliente_id):
     # ===================================
     # GET: MOSTRAR FORMULARIO CON INFO
     # ===================================
-    return render_template('pagos/formulario.html', cliente=cliente, pago=None)
+    
+    # ✅ Detectar si tiene pago único pendiente
+    pago_unico_pendiente = False
+    monto_pago_unico = 0
+    
+    if cliente.modalidad_pago == 'unico' and cliente.curso and not cliente.curso.es_indefinido:
+        if cliente.mensualidades_canceladas == 0:
+            pago_unico_pendiente = True
+            monto_inscripcion = float(cliente.curso.precio_inscripcion or 0)
+            monto_mensualidades = float(cliente.curso.precio_mensual) * cliente.curso.duracion_meses
+            monto_pago_unico = monto_inscripcion + monto_mensualidades
+            
+            app.logger.info(
+                f'⏳ Pago único pendiente detectado para {cliente.nombre_completo} - '
+                f'Monto: ${monto_pago_unico:.2f}'
+            )
+    
+    return render_template('pagos/formulario.html', 
+                         cliente=cliente, 
+                         pago=None,
+                         pago_unico_pendiente=pago_unico_pendiente,
+                         monto_pago_unico=monto_pago_unico)
 @app.route('/pagos/<int:id>/eliminar', methods=['POST'])
 @requiere_licencia_y_auth
 def pago_eliminar(id):
