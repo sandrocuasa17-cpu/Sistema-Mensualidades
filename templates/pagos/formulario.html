@@ -78,7 +78,7 @@
                     </div>
                     <button type="button" 
                             class="btn btn-warning btn-sm mt-2 w-100"
-                            onclick="document.getElementById('monto').value = {{ monto_pago_unico }}; actualizarVistaPrevia();">
+                            onclick="usarMontoPagoUnico()">
                         <i class="bi bi-lightning-fill"></i> Usar este monto
                     </button>
                 </div>
@@ -195,7 +195,7 @@
                 
                 <!-- Botones de Pago Rápido MEJORADOS -->
                 <div class="alert alert-light border mb-0">
-                        <strong><i class="bi bi-lightning-charge-fill text-warning"></i> Pagos Rápidos:</strong>
+                    <strong><i class="bi bi-lightning-charge-fill text-warning"></i> Pagos Rápidos:</strong>
                     <div class="btn-group-vertical w-100 mt-2" role="group">
                         
                         <!-- ✅ Botón de pago único (si está pendiente) -->
@@ -253,6 +253,95 @@
             </div>
             <div class="card-body">
                 <form method="POST" id="formPago">
+                    
+                    <!-- ✅ FECHA Y HORA DE PAGO (MANUAL) -->
+                    <div class="card mb-4 border-warning shadow-sm">
+                        <div class="card-header bg-warning bg-opacity-10 border-warning">
+                            <h6 class="mb-0 text-dark">
+                                <i class="bi bi-calendar-event-fill"></i> Fecha y Hora del Pago
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <!-- Columna Izquierda: Fecha -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="fecha_pago" class="form-label fw-bold mb-1">
+                                        <i class="bi bi-calendar-check"></i> Fecha del Pago *
+                                    </label>
+                                    <input type="date" 
+                                           class="form-control form-control-lg" 
+                                           id="fecha_pago" 
+                                           name="fecha_pago"
+                                           value=""
+                                           max="{{ now().strftime('%Y-%m-%d') }}"
+                                           required>
+                                    <small class="text-muted">
+                                        <i class="bi bi-exclamation-circle"></i> 
+                                        ¿Qué día se recibió el pago?
+                                    </small>
+                                </div>
+                                
+                                <!-- Columna Derecha: Hora -->
+                                <div class="col-md-6 mb-3">
+                                    <label for="hora_pago" class="form-label fw-bold mb-1">
+                                        <i class="bi bi-clock-fill"></i> Hora del Pago *
+                                    </label>
+                                    <input type="time" 
+                                           class="form-control form-control-lg" 
+                                           id="hora_pago" 
+                                           name="hora_pago"
+                                           value=""
+                                           required>
+                                    <small class="text-muted">
+                                        <i class="bi bi-exclamation-circle"></i> 
+                                        ¿A qué hora se recibió?
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <!-- Preview y Botones de Ayuda -->
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div id="fecha_preview_container" class="alert alert-success mb-0" style="display: none;">
+                                        <div class="row align-items-center">
+                                            <div class="col-auto">
+                                                <i class="bi bi-check-circle-fill" style="font-size: 32px;"></i>
+                                            </div>
+                                            <div class="col">
+                                                <strong>Pago registrado el:</strong><br>
+                                                <span class="fs-5" id="fecha_display">-</span><br>
+                                                <small class="text-muted">
+                                                    <i class="bi bi-calendar3"></i> <span id="dia_semana">-</span> 
+                                                    • 
+                                                    <i class="bi bi-clock"></i> <span id="hora_display">-</span>
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="alert alert-warning text-center py-3 mb-0" id="fecha_alert">
+                                        <i class="bi bi-exclamation-triangle" style="font-size: 32px; display: block; margin-bottom: 8px;"></i>
+                                        <strong>Fecha y hora pendientes</strong><br>
+                                        <small>Debes especificar cuándo se recibió el pago</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="d-grid gap-2">
+                                        <button type="button" 
+                                                class="btn btn-primary btn-lg"
+                                                onclick="usarAhora()">
+                                            <i class="bi bi-lightning-fill"></i> Usar AHORA
+                                        </button>
+                                        <button type="button" 
+                                                class="btn btn-outline-secondary"
+                                                onclick="usarHoy9AM()">
+                                            <i class="bi bi-sunrise"></i> Hoy 9:00 AM
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Selector de Concepto -->
                     <div class="mb-4">
                         <label class="form-label fw-bold">
@@ -373,6 +462,18 @@
                                 </div>
                             </div>
                             
+                            <!-- ✅ MOSTRAR FECHA Y HORA EN PREVIEW -->
+                            <div class="alert alert-info mb-3">
+                                <div class="row">
+                                    <div class="col-12">
+                                        <small class="text-muted">
+                                            <i class="bi bi-calendar-event"></i> Fecha y hora del pago:
+                                        </small>
+                                        <div class="fw-bold fs-5" id="previewFecha">Sin fecha/hora</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <!-- Desglose de distribución -->
                             <div id="previewDesglose" class="border-top pt-3"></div>
                             
@@ -449,23 +550,100 @@
             </div>
         </div>
        {% endif %}
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// Variables globales del curso
+// ============================================
+// VARIABLES GLOBALES DEL CURSO
+// ============================================
 const PRECIO_INSCRIPCION = {{ cliente.curso.precio_inscripcion if cliente.curso else 0 }};
 const PRECIO_MENSUAL = {{ cliente.curso.precio_mensual if cliente.curso else 0 }};
 const ABONO_INSCRIPCION = {{ cliente.abono_inscripcion or 0 }};
 const INSCRIPCION_PENDIENTE = {{ cliente.inscripcion_pendiente if cliente.curso else 0 }};
 const INSCRIPCION_PAGADA = {{ 'true' if cliente.inscripcion_pagada else 'false' }};
+const MONTO_PAGO_UNICO = {{ monto_pago_unico if pago_unico_pendiente else 0 }};
 
-// Función para seleccionar concepto y monto rápido
+const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+               'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+
+// ============================================
+// FUNCIONES PRINCIPALES
+// ============================================
+function usarAhora() {
+    const ahora = new Date();
+    const year = ahora.getFullYear();
+    const month = String(ahora.getMonth() + 1).padStart(2, '0');
+    const day = String(ahora.getDate()).padStart(2, '0');
+    document.getElementById('fecha_pago').value = `${year}-${month}-${day}`;
+    
+    const hours = String(ahora.getHours()).padStart(2, '0');
+    const minutes = String(ahora.getMinutes()).padStart(2, '0');
+    document.getElementById('hora_pago').value = `${hours}:${minutes}`;
+    
+    actualizarFecha();
+}
+
+function usarHoy9AM() {
+    const ahora = new Date();
+    const year = ahora.getFullYear();
+    const month = String(ahora.getMonth() + 1).padStart(2, '0');
+    const day = String(ahora.getDate()).padStart(2, '0');
+    document.getElementById('fecha_pago').value = `${year}-${month}-${day}`;
+    document.getElementById('hora_pago').value = '09:00';
+    actualizarFecha();
+}
+
+function actualizarFecha() {
+    const fechaInput = document.getElementById('fecha_pago');
+    const horaInput = document.getElementById('hora_pago');
+    const fechaDisplay = document.getElementById('fecha_display');
+    const horaDisplay = document.getElementById('hora_display');
+    const diaSemana = document.getElementById('dia_semana');
+    const previewFecha = document.getElementById('previewFecha');
+    const fechaPreviewContainer = document.getElementById('fecha_preview_container');
+    const fechaAlert = document.getElementById('fecha_alert');
+    
+    const tieneFecha = fechaInput && fechaInput.value;
+    const tieneHora = horaInput && horaInput.value;
+    
+    if (tieneFecha && tieneHora) {
+        const fecha = new Date(fechaInput.value + 'T00:00:00');
+        const dia = fecha.getDate();
+        const mes = fecha.getMonth();
+        const anio = fecha.getFullYear();
+        const diaSem = fecha.getDay();
+        const fechaFormateada = `${dia.toString().padStart(2, '0')}/${(mes + 1).toString().padStart(2, '0')}/${anio}`;
+        
+        const [horas, minutos] = horaInput.value.split(':');
+        const hora24 = parseInt(horas);
+        const hora12 = hora24 === 0 ? 12 : (hora24 > 12 ? hora24 - 12 : hora24);
+        const ampm = hora24 >= 12 ? 'PM' : 'AM';
+        const horaFormateada = `${hora12}:${minutos} ${ampm}`;
+        
+        fechaDisplay.textContent = fechaFormateada;
+        diaSemana.textContent = DIAS_SEMANA[diaSem];
+        horaDisplay.textContent = horaFormateada;
+        
+        if (fechaPreviewContainer) fechaPreviewContainer.style.display = 'block';
+        if (fechaAlert) fechaAlert.style.display = 'none';
+        if (previewFecha) previewFecha.textContent = `${fechaFormateada} ${horaFormateada}`;
+    } else {
+        if (fechaPreviewContainer) fechaPreviewContainer.style.display = 'none';
+        if (fechaAlert) fechaAlert.style.display = 'block';
+        if (previewFecha) previewFecha.textContent = 'Sin fecha/hora';
+    }
+    actualizarVistaPrevia();
+}
+
 function seleccionarConcepto(tipo, monto) {
     const montoInput = document.getElementById('monto');
     montoInput.value = monto.toFixed(2);
     
-    // Seleccionar radio button correspondiente
     if (tipo === 'inscripcion') {
         document.getElementById('concepto_inscripcion').checked = true;
     } else if (tipo === 'mensualidad') {
@@ -478,161 +656,155 @@ function seleccionarConcepto(tipo, monto) {
     montoInput.focus();
 }
 
+function usarMontoPagoUnico() {
+    if (MONTO_PAGO_UNICO > 0) {
+        document.getElementById('monto').value = MONTO_PAGO_UNICO.toFixed(2);
+        document.getElementById('concepto_auto').checked = true;
+        actualizarVistaPrevia();
+    }
+}
+
+function calcularDistribucion(monto, concepto) {
+    const distribucion = {
+        inscripcion: 0,
+        mensualidades: 0,
+        carry: 0,
+        mensualidades_completas: 0
+    };
+    
+    let saldo = parseFloat(monto) || 0;
+    if (saldo <= 0) return distribucion;
+    
+    if (concepto === 'auto') {
+        if (!INSCRIPCION_PAGADA && INSCRIPCION_PENDIENTE > 0) {
+            if (saldo >= INSCRIPCION_PENDIENTE) {
+                distribucion.inscripcion = INSCRIPCION_PENDIENTE;
+                saldo -= INSCRIPCION_PENDIENTE;
+            } else {
+                distribucion.inscripcion = saldo;
+                saldo = 0;
+            }
+        }
+        
+        if (saldo > 0 && PRECIO_MENSUAL > 0) {
+            distribucion.mensualidades_completas = Math.floor(saldo / PRECIO_MENSUAL);
+            distribucion.mensualidades = distribucion.mensualidades_completas * PRECIO_MENSUAL;
+            distribucion.carry = saldo - distribucion.mensualidades;
+        }
+    } else if (concepto === 'inscripcion') {
+        if (!INSCRIPCION_PAGADA && INSCRIPCION_PENDIENTE > 0) {
+            distribucion.inscripcion = Math.min(saldo, INSCRIPCION_PENDIENTE);
+        }
+    } else if (concepto === 'mensualidad') {
+        if (PRECIO_MENSUAL > 0) {
+            distribucion.mensualidades_completas = Math.floor(saldo / PRECIO_MENSUAL);
+            distribucion.mensualidades = distribucion.mensualidades_completas * PRECIO_MENSUAL;
+            distribucion.carry = saldo - distribucion.mensualidades;
+        }
+    }
+    
+    return distribucion;
+}
+
+function actualizarVistaPrevia() {
+    const monto = parseFloat(document.getElementById('monto').value) || 0;
+    const metodoSelect = document.getElementById('metodo_pago');
+    const metodo = metodoSelect.options[metodoSelect.selectedIndex]?.text || 'No especificado';
+    const periodo = document.getElementById('periodo').value || 'No especificado';
+    const concepto = document.querySelector('input[name="concepto_pago"]:checked')?.value || 'auto';
+    
+    if (monto > 0) {
+        document.getElementById('previewMonto').textContent = '$' + monto.toFixed(2);
+        document.getElementById('previewMetodo').textContent = metodo;
+        document.getElementById('previewPeriodo').textContent = periodo;
+        
+        const dist = calcularDistribucion(monto, concepto);
+        let desgloseHTML = '<div class="mb-2"><strong>Distribución del pago:</strong></div>';
+        
+        if (dist.inscripcion > 0) {
+            const completaInscripcion = (ABONO_INSCRIPCION + dist.inscripcion) >= PRECIO_INSCRIPCION;
+            desgloseHTML += `
+                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                    <div>
+                        <i class="bi bi-file-earmark-text text-primary"></i> 
+                        <strong>Inscripción:</strong>
+                        ${completaInscripcion ? '<span class="badge bg-success ms-2">✓ COMPLETA</span>' : ''}
+                    </div>
+                    <span class="badge bg-primary">$${dist.inscripcion.toFixed(2)}</span>
+                </div>
+            `;
+        }
+        
+        if (dist.mensualidades_completas > 0) {
+            desgloseHTML += `
+                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
+                    <div>
+                        <i class="bi bi-calendar-check text-success"></i> 
+                        <strong>Mensualidades:</strong>
+                        <span class="badge bg-success ms-2">${dist.mensualidades_completas} mes${dist.mensualidades_completas > 1 ? 'es' : ''}</span>
+                    </div>
+                    <span class="badge bg-success">$${dist.mensualidades.toFixed(2)}</span>
+                </div>
+            `;
+        }
+        
+        if (dist.carry > 0) {
+            const faltante = PRECIO_MENSUAL - dist.carry;
+            desgloseHTML += `
+                <div class="alert alert-info mb-0 py-2">
+                    <small>
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Crédito acumulado:</strong> $${dist.carry.toFixed(2)}
+                        <br>Faltan $${faltante.toFixed(2)} para completar otra mensualidad
+                    </small>
+                </div>
+            `;
+        }
+        
+        if (dist.inscripcion === 0 && dist.mensualidades === 0 && dist.carry === 0) {
+            desgloseHTML += `
+                <div class="alert alert-warning mb-0 py-2">
+                    <small><i class="bi bi-exclamation-triangle"></i> Monto insuficiente o concepto no aplicable</small>
+                </div>
+            `;
+        }
+        
+        document.getElementById('previewDesglose').innerHTML = desgloseHTML;
+        document.getElementById('vistaPrevia').style.display = 'block';
+        
+        const helperText = document.getElementById('montoHelper');
+        if (dist.inscripcion > 0 || dist.mensualidades > 0 || dist.carry > 0) {
+            helperText.innerHTML = '<i class="bi bi-check-circle text-success"></i> Pago válido';
+            helperText.className = 'form-text text-success';
+        } else {
+            helperText.innerHTML = '<i class="bi bi-info-circle"></i> Ingresa el monto a pagar';
+            helperText.className = 'form-text text-muted';
+        }
+    } else {
+        document.getElementById('vistaPrevia').style.display = 'none';
+    }
+}
+
+// ============================================
+// INICIALIZACIÓN
+// ============================================
 document.addEventListener('DOMContentLoaded', function() {
     const formPago = document.getElementById('formPago');
     const montoInput = document.getElementById('monto');
+    const fechaInput = document.getElementById('fecha_pago');
+    const horaInput = document.getElementById('hora_pago');
     const metodoPagoSelect = document.getElementById('metodo_pago');
     const periodoInput = document.getElementById('periodo');
-    const vistaPrevia = document.getElementById('vistaPrevia');
     const btnSubmit = document.getElementById('btnSubmit');
     const conceptoRadios = document.querySelectorAll('input[name="concepto_pago"]');
     
-    // Auto-generar periodo actual
-    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    fechaInput.addEventListener('change', actualizarFecha);
+    horaInput.addEventListener('change', actualizarFecha);
+    
     const fecha = new Date();
-    const periodoActual = `${meses[fecha.getMonth()]} ${fecha.getFullYear()}`;
+    const periodoActual = `${MESES[fecha.getMonth()]} ${fecha.getFullYear()}`;
     periodoInput.placeholder = `Ej: ${periodoActual}`;
     
-    // Función para calcular distribución del pago
-    function calcularDistribucion(monto, concepto) {
-        const distribucion = {
-            inscripcion: 0,
-            mensualidades: 0,
-            carry: 0,
-            mensualidades_completas: 0
-        };
-        
-        let saldo = parseFloat(monto) || 0;
-        
-        if (saldo <= 0) return distribucion;
-        
-        // Concepto automático
-        if (concepto === 'auto') {
-            // Primero inscripción
-            if (!INSCRIPCION_PAGADA && INSCRIPCION_PENDIENTE > 0) {
-                if (saldo >= INSCRIPCION_PENDIENTE) {
-                    distribucion.inscripcion = INSCRIPCION_PENDIENTE;
-                    saldo -= INSCRIPCION_PENDIENTE;
-                } else {
-                    distribucion.inscripcion = saldo;
-                    saldo = 0;
-                }
-            }
-            
-            // Luego mensualidades
-            if (saldo > 0 && PRECIO_MENSUAL > 0) {
-                distribucion.mensualidades_completas = Math.floor(saldo / PRECIO_MENSUAL);
-                distribucion.mensualidades = distribucion.mensualidades_completas * PRECIO_MENSUAL;
-                distribucion.carry = saldo - distribucion.mensualidades;
-            }
-        }
-        // Solo inscripción
-        else if (concepto === 'inscripcion') {
-            if (!INSCRIPCION_PAGADA && INSCRIPCION_PENDIENTE > 0) {
-                distribucion.inscripcion = Math.min(saldo, INSCRIPCION_PENDIENTE);
-            }
-        }
-        // Solo mensualidad
-        else if (concepto === 'mensualidad') {
-            if (PRECIO_MENSUAL > 0) {
-                distribucion.mensualidades_completas = Math.floor(saldo / PRECIO_MENSUAL);
-                distribucion.mensualidades = distribucion.mensualidades_completas * PRECIO_MENSUAL;
-                distribucion.carry = saldo - distribucion.mensualidades;
-            }
-        }
-        
-        return distribucion;
-    }
-    
-    // Función para actualizar vista previa
-    function actualizarVistaPrevia() {
-        const monto = parseFloat(montoInput.value) || 0;
-        const metodo = metodoPagoSelect.options[metodoPagoSelect.selectedIndex]?.text || 'No especificado';
-        const periodo = periodoInput.value || 'No especificado';
-        const concepto = document.querySelector('input[name="concepto_pago"]:checked')?.value || 'auto';
-        
-        if (monto > 0) {
-            // Mostrar monto
-            document.getElementById('previewMonto').textContent = '$' + monto.toFixed(2);
-            document.getElementById('previewMetodo').textContent = metodo;
-            document.getElementById('previewPeriodo').textContent = periodo;
-            
-            // Calcular distribución
-            const dist = calcularDistribucion(monto, concepto);
-            
-            // Generar desglose
-            let desgloseHTML = '<div class="mb-2"><strong>Distribución del pago:</strong></div>';
-            
-            if (dist.inscripcion > 0) {
-                const completaInscripcion = (ABONO_INSCRIPCION + dist.inscripcion) >= PRECIO_INSCRIPCION;
-                desgloseHTML += `
-                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                        <div>
-                            <i class="bi bi-file-earmark-text text-primary"></i> 
-                            <strong>Inscripción:</strong>
-                            ${completaInscripcion ? '<span class="badge bg-success ms-2">✓ COMPLETA</span>' : ''}
-                        </div>
-                        <span class="badge bg-primary">$${dist.inscripcion.toFixed(2)}</span>
-                    </div>
-                `;
-            }
-            
-            if (dist.mensualidades_completas > 0) {
-                desgloseHTML += `
-                    <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                        <div>
-                            <i class="bi bi-calendar-check text-success"></i> 
-                            <strong>Mensualidades:</strong>
-                            <span class="badge bg-success ms-2">${dist.mensualidades_completas} mes${dist.mensualidades_completas > 1 ? 'es' : ''}</span>
-                        </div>
-                        <span class="badge bg-success">$${dist.mensualidades.toFixed(2)}</span>
-                    </div>
-                `;
-            }
-            
-            if (dist.carry > 0) {
-                const faltante = PRECIO_MENSUAL - dist.carry;
-                desgloseHTML += `
-                    <div class="alert alert-info mb-0 py-2">
-                        <small>
-                            <i class="bi bi-info-circle"></i> 
-                            <strong>Crédito acumulado:</strong> $${dist.carry.toFixed(2)}
-                            <br>Faltan $${faltante.toFixed(2)} para completar otra mensualidad
-                        </small>
-                    </div>
-                `;
-            }
-            
-            if (dist.inscripcion === 0 && dist.mensualidades === 0 && dist.carry === 0) {
-                desgloseHTML += `
-                    <div class="alert alert-warning mb-0 py-2">
-                        <small><i class="bi bi-exclamation-triangle"></i> Monto insuficiente o concepto no aplicable</small>
-                    </div>
-                `;
-            }
-            
-            document.getElementById('previewDesglose').innerHTML = desgloseHTML;
-            vistaPrevia.style.display = 'block';
-            
-            // Helper text para el input
-            const helperText = document.getElementById('montoHelper');
-            if (dist.inscripcion > 0 || dist.mensualidades > 0 || dist.carry > 0) {
-                helperText.innerHTML = '<i class="bi bi-check-circle text-success"></i> Pago válido';
-                helperText.className = 'form-text text-success';
-            } else {
-                helperText.innerHTML = '<i class="bi bi-info-circle"></i> Ingresa el monto a pagar';
-                helperText.className = 'form-text text-muted';
-            }
-        } else {
-            vistaPrevia.style.display = 'none';
-        }
-    }
-    
-    // Hacer función global
-    window.actualizarVistaPrevia = actualizarVistaPrevia;
-    
-    // Event listeners
     montoInput.addEventListener('input', actualizarVistaPrevia);
     metodoPagoSelect.addEventListener('change', actualizarVistaPrevia);
     periodoInput.addEventListener('input', actualizarVistaPrevia);
@@ -640,9 +812,24 @@ document.addEventListener('DOMContentLoaded', function() {
         radio.addEventListener('change', actualizarVistaPrevia);
     });
     
-    // Validación al enviar
     formPago.addEventListener('submit', function(e) {
         const monto = parseFloat(montoInput.value);
+        const fecha = fechaInput.value;
+        const hora = horaInput.value;
+        
+        if (!fecha) {
+            e.preventDefault();
+            alert('❌ Debes seleccionar la FECHA en que se realizó el pago');
+            fechaInput.focus();
+            return false;
+        }
+        
+        if (!hora) {
+            e.preventDefault();
+            alert('❌ Debes especificar la HORA en que se recibió el pago');
+            horaInput.focus();
+            return false;
+        }
         
         if (!monto || monto <= 0) {
             e.preventDefault();
@@ -651,13 +838,11 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
         
-        // ✅ Validación especial para pago único pendiente
         {% if pago_unico_pendiente %}
         const montoPagoUnico = {{ monto_pago_unico }};
         const diferencia = Math.abs(monto - montoPagoUnico);
         
         if (diferencia > 0.01 && diferencia < montoPagoUnico * 0.1) {
-            // Si la diferencia es pequeña pero notable (menos del 10%)
             const confirmacion = confirm(
                 `⚠️ ADVERTENCIA\n\n` +
                 `Este estudiante tiene pago único pendiente de $${montoPagoUnico.toFixed(2)}\n` +
@@ -673,13 +858,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         {% endif %}
         
-        // Deshabilitar botón
         btnSubmit.disabled = true;
         btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
     });
     
-    // Inicializar
+    actualizarFecha();
     actualizarVistaPrevia();
 });
+
+window.actualizarVistaPrevia = actualizarVistaPrevia;
+window.actualizarFecha = actualizarFecha;
+window.seleccionarConcepto = seleccionarConcepto;
+window.usarMontoPagoUnico = usarMontoPagoUnico;
+window.usarAhora = usarAhora;
+window.usarHoy9AM = usarHoy9AM;
 </script>
 {% endblock %}
