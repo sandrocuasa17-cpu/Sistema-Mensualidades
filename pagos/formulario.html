@@ -47,351 +47,52 @@
             </div>
         </div>
 
-        <!-- ✅ ALERTA: PAGO ÚNICO PENDIENTE -->
-        {% if pago_unico_pendiente %}
-        <div class="alert alert-warning shadow-lg border-warning mb-4" style="border-left: 5px solid #ffc107;">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h4 class="alert-heading mb-2">
-                        <i class="bi bi-star-fill"></i> Pago Único del Curso Completo
-                    </h4>
-                    <p class="mb-2">
-                        Este estudiante eligió la modalidad de <strong>pago único</strong>. 
-                        Debe pagar el curso completo para activar su cobertura.
-                    </p>
-                    <hr>
-                    <div class="row">
-                        <div class="col-md-6 mb-2">
-                            <small class="text-muted">Inscripción:</small><br>
-                            <strong>${{ "%.2f"|format(cliente.curso.precio_inscripcion) }}</strong>
-                        </div>
-                        <div class="col-md-6 mb-2">
-                            <small class="text-muted">{{ cliente.curso.duracion_meses }} Mensualidades:</small><br>
-                            <strong>${{ "%.2f"|format(cliente.curso.precio_mensual * cliente.curso.duracion_meses) }}</strong>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-4 text-center">
-                    <div class="p-3 bg-warning text-dark rounded">
-                        <small class="d-block mb-1">TOTAL A PAGAR</small>
-                        <h1 class="mb-0 fw-bold">${{ "%.2f"|format(monto_pago_unico) }}</h1>
-                    </div>
-                    <button type="button" 
-                            class="btn btn-warning btn-sm mt-2 w-100"
-                            onclick="usarMontoPagoUnico()">
-                        <i class="bi bi-lightning-fill"></i> Usar este monto
-                    </button>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- ✅ DESGLOSE DE DEUDAS MEJORADO -->
-        {% if cliente.curso %}
-        <div class="card mb-4 border-primary">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    <i class="bi bi-calculator"></i> Estado de Cuenta
-                </h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <!-- Inscripción -->
-                    <div class="col-md-6 mb-3">
-                        <div class="card h-100 {% if cliente.inscripcion_pagada %}border-success{% else %}border-warning{% endif %}">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="text-muted mb-0">
-                                        <i class="bi bi-file-earmark-text"></i> Inscripción
-                                    </h6>
-                                    {% if cliente.inscripcion_pagada %}
-                                        <span class="badge bg-success">
-                                            <i class="bi bi-check-circle-fill"></i> PAGADA
-                                        </span>
-                                    {% else %}
-                                        <span class="badge bg-warning text-dark">
-                                            <i class="bi bi-clock-fill"></i> PENDIENTE
-                                        </span>
-                                    {% endif %}
-                                </div>
-                                
-                                <div class="mb-2">
-                                    <small class="text-muted">Valor Total:</small>
-                                    <h4 class="mb-0">${{ "%.2f"|format(cliente.curso.precio_inscripcion) }}</h4>
-                                </div>
-                                
-                                {% if not cliente.inscripcion_pagada %}
-                                    <div class="mb-2">
-                                        <small class="text-muted">Abonado:</small>
-                                        <div class="text-info fw-bold">${{ "%.2f"|format(cliente.abono_inscripcion or 0) }}</div>
-                                    </div>
-                                    <div>
-                                        <small class="text-muted">Pendiente:</small>
-                                        <div class="text-danger fw-bold">${{ "%.2f"|format(cliente.inscripcion_pendiente) }}</div>
-                                    </div>
-                                    
-                                    <!-- Barra de progreso -->
-                                    {% set progreso = (cliente.abono_inscripcion or 0) / cliente.curso.precio_inscripcion * 100 %}
-                                    <div class="progress mt-2" style="height: 8px;">
-                                        <div class="progress-bar bg-info" role="progressbar" 
-                                             style="width: {{ progreso }}%"
-                                             aria-valuenow="{{ progreso }}" 
-                                             aria-valuemin="0" 
-                                             aria-valuemax="100"></div>
-                                    </div>
-                                    <small class="text-muted">{{ "%.1f"|format(progreso) }}% completado</small>
-                                {% else %}
-                                    <div class="alert alert-success mb-0 py-2">
-                                        <i class="bi bi-check-circle"></i> Inscripción completada
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Mensualidad -->
-                    <div class="col-md-6 mb-3">
-                        <div class="card h-100 border-info">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="text-muted mb-0">
-                                        <i class="bi bi-calendar-month"></i> Mensualidad
-                                    </h6>
-                                    <span class="badge bg-info">
-                                        {{ cliente.mensualidades_canceladas }} pagadas
-                                    </span>
-                                </div>
-                                
-                                <div class="mb-2">
-                                    <small class="text-muted">Valor Mensual:</small>
-                                    <h4 class="mb-0">${{ "%.2f"|format(cliente.curso.precio_mensual) }}</h4>
-                                </div>
-                                
-                                {% if cliente.fecha_fin %}
-                                    <div class="mb-2">
-                                        <small class="text-muted">Cobertura hasta:</small>
-                                        <div class="fw-bold text-primary">
-                                            {{ cliente.fecha_fin.strftime('%d/%m/%Y') }}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <small class="text-muted">Días restantes:</small>
-                                        <div class="fw-bold 
-                                            {% if cliente.dias_restantes and cliente.dias_restantes > 7 %}text-success
-                                            {% elif cliente.dias_restantes and cliente.dias_restantes > 0 %}text-warning
-                                            {% else %}text-danger{% endif %}">
-                                            {{ cliente.dias_restantes if cliente.dias_restantes and cliente.dias_restantes > 0 else 'VENCIDO' }}
-                                        </div>
-                                    </div>
-                                {% else %}
-                                    <div class="alert alert-warning mb-0 py-2">
-                                        <i class="bi bi-exclamation-triangle"></i> Sin cobertura activa
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Botones de Pago Rápido MEJORADOS -->
-                <div class="alert alert-light border mb-0">
-                    <strong><i class="bi bi-lightning-charge-fill text-warning"></i> Pagos Rápidos:</strong>
-                    <div class="btn-group-vertical w-100 mt-2" role="group">
-                        
-                        <!-- ✅ Botón de pago único (si está pendiente) -->
-                        {% if pago_unico_pendiente %}
-                            <button type="button" class="btn btn-outline-warning mb-2" 
-                                    onclick="seleccionarConcepto('auto', {{ monto_pago_unico }})">
-                                <i class="bi bi-star-fill"></i> Pagar Curso Completo (ÚNICO)
-                                <span class="badge bg-warning text-dark">${{ "%.2f"|format(monto_pago_unico) }}</span>
-                            </button>
-                            <hr class="my-2">
-                        {% endif %}
-                        
-                        {% if not cliente.inscripcion_pagada %}
-                            <button type="button" class="btn btn-outline-primary mb-2" 
-                                    onclick="seleccionarConcepto('inscripcion', {{ cliente.inscripcion_pendiente }})">
-                                <i class="bi bi-file-earmark-check"></i> Pagar Inscripción Completa 
-                                <span class="badge bg-primary">${{ "%.2f"|format(cliente.inscripcion_pendiente) }}</span>
-                            </button>
-                        {% endif %}
-                        
-                        <button type="button" class="btn btn-outline-success mb-2" 
-                                onclick="seleccionarConcepto('mensualidad', {{ cliente.curso.precio_mensual }})">
-                            <i class="bi bi-calendar-check"></i> Pagar 1 Mensualidad
-                            <span class="badge bg-success">${{ "%.2f"|format(cliente.curso.precio_mensual) }}</span>
-                        </button>
-                        
-                        {% if not cliente.inscripcion_pagada %}
-                            {% set total_completo = cliente.inscripcion_pendiente + cliente.curso.precio_mensual %}
-                            <button type="button" class="btn btn-outline-warning" 
-                                    onclick="seleccionarConcepto('completo', {{ total_completo }})">
-                                <i class="bi bi-check-all"></i> Inscripción + 1 Mensualidad
-                                <span class="badge bg-warning text-dark">${{ "%.2f"|format(total_completo) }}</span>
-                            </button>
-                        {% endif %}
-                    </div>
-                    
-                    <div class="mt-3 p-2 bg-info bg-opacity-10 rounded">
-                        <small class="text-muted">
-                            <i class="bi bi-info-circle"></i> 
-                            <strong>Abonos parciales:</strong> Puedes pagar cualquier monto y se distribuirá automáticamente
-                            (primero inscripción, luego mensualidades).
-                        </small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
         <!-- Formulario de Pago -->
         <div class="card">
             <div class="card-header" style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
                 <h5 class="mb-0">
-                    <i class="bi bi-cash-stack"></i> Registrar Pago
+                    <i class="bi bi-cash-stack"></i> Datos del Pago
                 </h5>
             </div>
             <div class="card-body">
                 <form method="POST" id="formPago">
-                    
-                    <!-- ✅ FECHA Y HORA DE PAGO (MANUAL) -->
-                    <div class="card mb-4 border-warning shadow-sm">
-                        <div class="card-header bg-warning bg-opacity-10 border-warning">
-                            <h6 class="mb-0 text-dark">
-                                <i class="bi bi-calendar-event-fill"></i> Fecha y Hora del Pago
-                            </h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="row">
-                                <!-- Columna Izquierda: Fecha -->
-                                <div class="col-md-6 mb-3">
-                                    <label for="fecha_pago" class="form-label fw-bold mb-1">
-                                        <i class="bi bi-calendar-check"></i> Fecha del Pago *
-                                    </label>
-                                    <input type="date" 
-                                           class="form-control form-control-lg" 
-                                           id="fecha_pago" 
-                                           name="fecha_pago"
-                                           value=""
-                                           max="{{ now().strftime('%Y-%m-%d') }}"
-                                           required>
-                                    <small class="text-muted">
-                                        <i class="bi bi-exclamation-circle"></i> 
-                                        ¿Qué día se recibió el pago?
-                                    </small>
-                                </div>
-                                
-                                <!-- Columna Derecha: Hora -->
-                                <div class="col-md-6 mb-3">
-                                    <label for="hora_pago" class="form-label fw-bold mb-1">
-                                        <i class="bi bi-clock-fill"></i> Hora del Pago *
-                                    </label>
-                                    <input type="time" 
-                                           class="form-control form-control-lg" 
-                                           id="hora_pago" 
-                                           name="hora_pago"
-                                           value=""
-                                           required>
-                                    <small class="text-muted">
-                                        <i class="bi bi-exclamation-circle"></i> 
-                                        ¿A qué hora se recibió?
-                                    </small>
-                                </div>
-                            </div>
-                            
-                            <!-- Preview y Botones de Ayuda -->
-                            <div class="row">
-                                <div class="col-md-8">
-                                    <div id="fecha_preview_container" class="alert alert-success mb-0" style="display: none;">
-                                        <div class="row align-items-center">
-                                            <div class="col-auto">
-                                                <i class="bi bi-check-circle-fill" style="font-size: 32px;"></i>
-                                            </div>
-                                            <div class="col">
-                                                <strong>Pago registrado el:</strong><br>
-                                                <span class="fs-5" id="fecha_display">-</span><br>
-                                                <small class="text-muted">
-                                                    <i class="bi bi-calendar3"></i> <span id="dia_semana">-</span> 
-                                                    • 
-                                                    <i class="bi bi-clock"></i> <span id="hora_display">-</span>
-                                                </small>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="alert alert-warning text-center py-3 mb-0" id="fecha_alert">
-                                        <i class="bi bi-exclamation-triangle" style="font-size: 32px; display: block; margin-bottom: 8px;"></i>
-                                        <strong>Fecha y hora pendientes</strong><br>
-                                        <small>Debes especificar cuándo se recibió el pago</small>
-                                    </div>
-                                </div>
-                                <div class="col-md-4">
-                                    <div class="d-grid gap-2">
-                                        <button type="button" 
-                                                class="btn btn-primary btn-lg"
-                                                onclick="usarAhora()">
-                                            <i class="bi bi-lightning-fill"></i> Usar AHORA
-                                        </button>
-                                        <button type="button" 
-                                                class="btn btn-outline-secondary"
-                                                onclick="usarHoy9AM()">
-                                            <i class="bi bi-sunrise"></i> Hoy 9:00 AM
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Selector de Concepto -->
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">
-                            <i class="bi bi-tag"></i> Concepto del Pago
-                        </label>
-                        <div class="btn-group w-100" role="group">
-                            <input type="radio" class="btn-check" name="concepto_pago" id="concepto_auto" value="auto" checked>
-                            <label class="btn btn-outline-primary" for="concepto_auto">
-                                <i class="bi bi-magic"></i> Automático
-                            </label>
-                            
-                            <input type="radio" class="btn-check" name="concepto_pago" id="concepto_inscripcion" value="inscripcion">
-                            <label class="btn btn-outline-info" for="concepto_inscripcion">
-                                <i class="bi bi-file-earmark"></i> Inscripción
-                            </label>
-                            
-                            <input type="radio" class="btn-check" name="concepto_pago" id="concepto_mensualidad" value="mensualidad">
-                            <label class="btn btn-outline-success" for="concepto_mensualidad">
-                                <i class="bi bi-calendar"></i> Mensualidad
-                            </label>
-                        </div>
-                        <small class="text-muted">
-                            <strong>Automático:</strong> Primero inscripción, luego mensualidades
-                        </small>
-                    </div>
-
                     <!-- Monto -->
                     <div class="mb-4">
-                        <label for="monto" class="form-label fw-bold">
+                        <label for="monto" class="form-label">
                             <i class="bi bi-currency-dollar"></i> Monto a Pagar *
                         </label>
                         <div class="input-group input-group-lg">
-                            <span class="input-group-text bg-success text-white">$</span>
+                            <span class="input-group-text">$</span>
                             <input type="number" 
-                                   class="form-control form-control-lg" 
+                                   class="form-control" 
                                    id="monto" 
                                    name="monto" 
                                    step="0.01" 
                                    min="0.01"
-                                   value=""
+                                   value="{{ cliente.curso.precio_mensual if cliente.curso else '' }}"
                                    required
                                    autofocus>
                         </div>
-                        <div id="montoHelper" class="form-text"></div>
+                        {% if cliente.curso %}
+                        <div class="form-text">
+                            <i class="bi bi-info-circle"></i> 
+                            Monto sugerido (mensualidad): <strong class="text-success">${{ "%.2f"|format(cliente.curso.precio_mensual) }}</strong>
+                        </div>
+                        {% endif %}
+                        {% if cliente.saldo_pendiente > 0 %}
+                        <div class="alert alert-warning mt-2 py-2">
+                            <small>
+                                <i class="bi bi-exclamation-triangle"></i> 
+                                El estudiante tiene <strong>${{ "%.2f"|format(cliente.saldo_pendiente) }}</strong> pendiente
+                            </small>
+                        </div>
+                        {% endif %}
                     </div>
 
                     <div class="row">
                         <!-- Método de Pago -->
                         <div class="col-md-6 mb-3">
-                            <label for="metodo_pago" class="form-label fw-bold">
+                            <label for="metodo_pago" class="form-label">
                                 <i class="bi bi-credit-card"></i> Método de Pago
                             </label>
                             <select class="form-select" id="metodo_pago" name="metodo_pago">
@@ -408,33 +109,36 @@
 
                         <!-- Periodo -->
                         <div class="col-md-6 mb-3">
-                            <label for="periodo" class="form-label fw-bold">
-                                <i class="bi bi-calendar-month"></i> Periodo
+                            <label for="periodo" class="form-label">
+                                <i class="bi bi-calendar-month"></i> Periodo que Cubre
                             </label>
                             <input type="text" 
                                    class="form-control" 
                                    id="periodo" 
                                    name="periodo" 
                                    placeholder="Ej: Enero 2025">
-                            <small class="text-muted">Mes o periodo que cubre</small>
+                            <small class="text-muted">Mes o periodo que cubre este pago</small>
                         </div>
                     </div>
 
                     <!-- Referencia -->
                     <div class="mb-3">
-                        <label for="referencia" class="form-label fw-bold">
+                        <label for="referencia" class="form-label">
                             <i class="bi bi-receipt"></i> Referencia/Comprobante
                         </label>
                         <input type="text" 
                                class="form-control" 
                                id="referencia" 
                                name="referencia" 
-                               placeholder="Número de referencia o transacción">
+                               placeholder="Número de referencia, comprobante o transacción">
+                        <small class="text-muted">
+                            Opcional: número de referencia bancaria, ID de transacción, etc.
+                        </small>
                     </div>
 
                     <!-- Notas -->
                     <div class="mb-4">
-                        <label for="notas" class="form-label fw-bold">
+                        <label for="notas" class="form-label">
                             <i class="bi bi-chat-left-text"></i> Notas Adicionales
                         </label>
                         <textarea class="form-control" 
@@ -444,47 +148,32 @@
                                   placeholder="Información adicional sobre este pago..."></textarea>
                     </div>
 
-                    <!-- Vista Previa del Pago MEJORADA -->
+                    <!-- Vista Previa del Pago -->
                     <div class="card bg-light mb-4" id="vistaPrevia" style="display: none;">
                         <div class="card-body">
                             <h6 class="text-primary mb-3">
-                                <i class="bi bi-eye-fill"></i> Vista Previa del Pago
+                                <i class="bi bi-eye"></i> Vista Previa del Pago
                             </h6>
-                            
-                            <div class="row mb-3">
+                            <div class="row">
                                 <div class="col-md-6">
-                                    <small class="text-muted">Estudiante:</small>
-                                    <div class="fw-bold">{{ cliente.nombre_completo }}</div>
+                                    <p class="mb-2">
+                                        <strong>Estudiante:</strong><br>
+                                        {{ cliente.nombre_completo }}
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Monto:</strong><br>
+                                        <span class="text-success fs-4" id="previewMonto">$0.00</span>
+                                    </p>
                                 </div>
                                 <div class="col-md-6">
-                                    <small class="text-muted">Monto Total:</small>
-                                    <div class="text-success fs-4 fw-bold" id="previewMonto">$0.00</div>
-                                </div>
-                            </div>
-                            
-                            <!-- ✅ MOSTRAR FECHA Y HORA EN PREVIEW -->
-                            <div class="alert alert-info mb-3">
-                                <div class="row">
-                                    <div class="col-12">
-                                        <small class="text-muted">
-                                            <i class="bi bi-calendar-event"></i> Fecha y hora del pago:
-                                        </small>
-                                        <div class="fw-bold fs-5" id="previewFecha">Sin fecha/hora</div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Desglose de distribución -->
-                            <div id="previewDesglose" class="border-top pt-3"></div>
-                            
-                            <div class="row mt-3">
-                                <div class="col-md-6">
-                                    <small class="text-muted">Método:</small>
-                                    <div id="previewMetodo" class="fw-bold">No especificado</div>
-                                </div>
-                                <div class="col-md-6">
-                                    <small class="text-muted">Periodo:</small>
-                                    <div id="previewPeriodo" class="fw-bold">No especificado</div>
+                                    <p class="mb-2">
+                                        <strong>Método:</strong><br>
+                                        <span id="previewMetodo" class="text-muted">No especificado</span>
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Periodo:</strong><br>
+                                        <span id="previewPeriodo" class="text-muted">No especificado</span>
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -500,7 +189,7 @@
                         </div>
                         <div class="col-md-6 mb-2">
                             <button type="submit" class="btn btn-success btn-lg w-100" id="btnSubmit">
-                                <i class="bi bi-check-circle-fill"></i> Registrar Pago
+                                <i class="bi bi-check-circle"></i> Registrar Pago
                             </button>
                         </div>
                     </div>
@@ -511,20 +200,20 @@
         <!-- Historial Reciente -->
         {% if cliente.pagos %}
         <div class="card mt-4">
-            <div class="card-header bg-light">
+            <div class="card-header">
                 <h5 class="card-title mb-0">
-                    <i class="bi bi-clock-history"></i> Últimos Pagos
+                    <i class="bi bi-clock-history"></i> Últimos Pagos de {{ cliente.nombre }}
                 </h5>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover align-middle">
-                        <thead class="table-light">
+                    <table class="table table-sm table-hover">
+                        <thead>
                             <tr>
                                 <th>Fecha</th>
                                 <th>Monto</th>
-                                <th>Concepto</th>
                                 <th>Método</th>
+                                <th>Periodo</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -537,299 +226,78 @@
                                     <span class="badge bg-success">${{ "%.2f"|format(pago.monto) }}</span>
                                 </td>
                                 <td>
-                                    <small>{{ pago.concepto or 'Automático' }}</small>
+                                    <small>{{ pago.metodo_pago or '-' }}</small>
                                 </td>
                                 <td>
-                                    <small>{{ pago.metodo_pago or '-' }}</small>
+                                    <small>{{ pago.periodo or '-' }}</small>
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td><strong>Total histórico:</strong></td>
+                                <td colspan="3">
+                                    <strong class="text-success">
+                                        ${{ "%.2f"|format(cliente.pagos|sum(attribute='monto')) }}
+                                    </strong>
+                                </td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
+                <small class="text-muted">
+                    <i class="bi bi-info-circle"></i> 
+                    Mostrando los últimos 5 pagos de {{ cliente.pagos|length }} total
+                </small>
             </div>
         </div>
-       {% endif %}
+        {% endif %}
     </div>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
 <script>
-// ============================================
-// VARIABLES GLOBALES DEL CURSO
-// ============================================
-const PRECIO_INSCRIPCION = {{ cliente.curso.precio_inscripcion if cliente.curso else 0 }};
-const PRECIO_MENSUAL = {{ cliente.curso.precio_mensual if cliente.curso else 0 }};
-const ABONO_INSCRIPCION = {{ cliente.abono_inscripcion or 0 }};
-const INSCRIPCION_PENDIENTE = {{ cliente.inscripcion_pendiente if cliente.curso else 0 }};
-const INSCRIPCION_PAGADA = {{ 'true' if cliente.inscripcion_pagada else 'false' }};
-const MONTO_PAGO_UNICO = {{ monto_pago_unico if pago_unico_pendiente else 0 }};
-
-const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
-               'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-
-// ============================================
-// FUNCIONES PRINCIPALES
-// ============================================
-function usarAhora() {
-    const ahora = new Date();
-    const year = ahora.getFullYear();
-    const month = String(ahora.getMonth() + 1).padStart(2, '0');
-    const day = String(ahora.getDate()).padStart(2, '0');
-    document.getElementById('fecha_pago').value = `${year}-${month}-${day}`;
-    
-    const hours = String(ahora.getHours()).padStart(2, '0');
-    const minutes = String(ahora.getMinutes()).padStart(2, '0');
-    document.getElementById('hora_pago').value = `${hours}:${minutes}`;
-    
-    actualizarFecha();
-}
-
-function usarHoy9AM() {
-    const ahora = new Date();
-    const year = ahora.getFullYear();
-    const month = String(ahora.getMonth() + 1).padStart(2, '0');
-    const day = String(ahora.getDate()).padStart(2, '0');
-    document.getElementById('fecha_pago').value = `${year}-${month}-${day}`;
-    document.getElementById('hora_pago').value = '09:00';
-    actualizarFecha();
-}
-
-function actualizarFecha() {
-    const fechaInput = document.getElementById('fecha_pago');
-    const horaInput = document.getElementById('hora_pago');
-    const fechaDisplay = document.getElementById('fecha_display');
-    const horaDisplay = document.getElementById('hora_display');
-    const diaSemana = document.getElementById('dia_semana');
-    const previewFecha = document.getElementById('previewFecha');
-    const fechaPreviewContainer = document.getElementById('fecha_preview_container');
-    const fechaAlert = document.getElementById('fecha_alert');
-    
-    const tieneFecha = fechaInput && fechaInput.value;
-    const tieneHora = horaInput && horaInput.value;
-    
-    if (tieneFecha && tieneHora) {
-        const fecha = new Date(fechaInput.value + 'T00:00:00');
-        const dia = fecha.getDate();
-        const mes = fecha.getMonth();
-        const anio = fecha.getFullYear();
-        const diaSem = fecha.getDay();
-        const fechaFormateada = `${dia.toString().padStart(2, '0')}/${(mes + 1).toString().padStart(2, '0')}/${anio}`;
-        
-        const [horas, minutos] = horaInput.value.split(':');
-        const hora24 = parseInt(horas);
-        const hora12 = hora24 === 0 ? 12 : (hora24 > 12 ? hora24 - 12 : hora24);
-        const ampm = hora24 >= 12 ? 'PM' : 'AM';
-        const horaFormateada = `${hora12}:${minutos} ${ampm}`;
-        
-        fechaDisplay.textContent = fechaFormateada;
-        diaSemana.textContent = DIAS_SEMANA[diaSem];
-        horaDisplay.textContent = horaFormateada;
-        
-        if (fechaPreviewContainer) fechaPreviewContainer.style.display = 'block';
-        if (fechaAlert) fechaAlert.style.display = 'none';
-        if (previewFecha) previewFecha.textContent = `${fechaFormateada} ${horaFormateada}`;
-    } else {
-        if (fechaPreviewContainer) fechaPreviewContainer.style.display = 'none';
-        if (fechaAlert) fechaAlert.style.display = 'block';
-        if (previewFecha) previewFecha.textContent = 'Sin fecha/hora';
-    }
-    actualizarVistaPrevia();
-}
-
-function seleccionarConcepto(tipo, monto) {
-    const montoInput = document.getElementById('monto');
-    montoInput.value = monto.toFixed(2);
-    
-    if (tipo === 'inscripcion') {
-        document.getElementById('concepto_inscripcion').checked = true;
-    } else if (tipo === 'mensualidad') {
-        document.getElementById('concepto_mensualidad').checked = true;
-    } else {
-        document.getElementById('concepto_auto').checked = true;
-    }
-    
-    actualizarVistaPrevia();
-    montoInput.focus();
-}
-
-function usarMontoPagoUnico() {
-    if (MONTO_PAGO_UNICO > 0) {
-        document.getElementById('monto').value = MONTO_PAGO_UNICO.toFixed(2);
-        document.getElementById('concepto_auto').checked = true;
-        actualizarVistaPrevia();
-    }
-}
-
-function calcularDistribucion(monto, concepto) {
-    const distribucion = {
-        inscripcion: 0,
-        mensualidades: 0,
-        carry: 0,
-        mensualidades_completas: 0
-    };
-    
-    let saldo = parseFloat(monto) || 0;
-    if (saldo <= 0) return distribucion;
-    
-    if (concepto === 'auto') {
-        if (!INSCRIPCION_PAGADA && INSCRIPCION_PENDIENTE > 0) {
-            if (saldo >= INSCRIPCION_PENDIENTE) {
-                distribucion.inscripcion = INSCRIPCION_PENDIENTE;
-                saldo -= INSCRIPCION_PENDIENTE;
-            } else {
-                distribucion.inscripcion = saldo;
-                saldo = 0;
-            }
-        }
-        
-        if (saldo > 0 && PRECIO_MENSUAL > 0) {
-            distribucion.mensualidades_completas = Math.floor(saldo / PRECIO_MENSUAL);
-            distribucion.mensualidades = distribucion.mensualidades_completas * PRECIO_MENSUAL;
-            distribucion.carry = saldo - distribucion.mensualidades;
-        }
-    } else if (concepto === 'inscripcion') {
-        if (!INSCRIPCION_PAGADA && INSCRIPCION_PENDIENTE > 0) {
-            distribucion.inscripcion = Math.min(saldo, INSCRIPCION_PENDIENTE);
-        }
-    } else if (concepto === 'mensualidad') {
-        if (PRECIO_MENSUAL > 0) {
-            distribucion.mensualidades_completas = Math.floor(saldo / PRECIO_MENSUAL);
-            distribucion.mensualidades = distribucion.mensualidades_completas * PRECIO_MENSUAL;
-            distribucion.carry = saldo - distribucion.mensualidades;
-        }
-    }
-    
-    return distribucion;
-}
-
-function actualizarVistaPrevia() {
-    const monto = parseFloat(document.getElementById('monto').value) || 0;
-    const metodoSelect = document.getElementById('metodo_pago');
-    const metodo = metodoSelect.options[metodoSelect.selectedIndex]?.text || 'No especificado';
-    const periodo = document.getElementById('periodo').value || 'No especificado';
-    const concepto = document.querySelector('input[name="concepto_pago"]:checked')?.value || 'auto';
-    
-    if (monto > 0) {
-        document.getElementById('previewMonto').textContent = '$' + monto.toFixed(2);
-        document.getElementById('previewMetodo').textContent = metodo;
-        document.getElementById('previewPeriodo').textContent = periodo;
-        
-        const dist = calcularDistribucion(monto, concepto);
-        let desgloseHTML = '<div class="mb-2"><strong>Distribución del pago:</strong></div>';
-        
-        if (dist.inscripcion > 0) {
-            const completaInscripcion = (ABONO_INSCRIPCION + dist.inscripcion) >= PRECIO_INSCRIPCION;
-            desgloseHTML += `
-                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                    <div>
-                        <i class="bi bi-file-earmark-text text-primary"></i> 
-                        <strong>Inscripción:</strong>
-                        ${completaInscripcion ? '<span class="badge bg-success ms-2">✓ COMPLETA</span>' : ''}
-                    </div>
-                    <span class="badge bg-primary">$${dist.inscripcion.toFixed(2)}</span>
-                </div>
-            `;
-        }
-        
-        if (dist.mensualidades_completas > 0) {
-            desgloseHTML += `
-                <div class="d-flex justify-content-between mb-2 pb-2 border-bottom">
-                    <div>
-                        <i class="bi bi-calendar-check text-success"></i> 
-                        <strong>Mensualidades:</strong>
-                        <span class="badge bg-success ms-2">${dist.mensualidades_completas} mes${dist.mensualidades_completas > 1 ? 'es' : ''}</span>
-                    </div>
-                    <span class="badge bg-success">$${dist.mensualidades.toFixed(2)}</span>
-                </div>
-            `;
-        }
-        
-        if (dist.carry > 0) {
-            const faltante = PRECIO_MENSUAL - dist.carry;
-            desgloseHTML += `
-                <div class="alert alert-info mb-0 py-2">
-                    <small>
-                        <i class="bi bi-info-circle"></i> 
-                        <strong>Crédito acumulado:</strong> $${dist.carry.toFixed(2)}
-                        <br>Faltan $${faltante.toFixed(2)} para completar otra mensualidad
-                    </small>
-                </div>
-            `;
-        }
-        
-        if (dist.inscripcion === 0 && dist.mensualidades === 0 && dist.carry === 0) {
-            desgloseHTML += `
-                <div class="alert alert-warning mb-0 py-2">
-                    <small><i class="bi bi-exclamation-triangle"></i> Monto insuficiente o concepto no aplicable</small>
-                </div>
-            `;
-        }
-        
-        document.getElementById('previewDesglose').innerHTML = desgloseHTML;
-        document.getElementById('vistaPrevia').style.display = 'block';
-        
-        const helperText = document.getElementById('montoHelper');
-        if (dist.inscripcion > 0 || dist.mensualidades > 0 || dist.carry > 0) {
-            helperText.innerHTML = '<i class="bi bi-check-circle text-success"></i> Pago válido';
-            helperText.className = 'form-text text-success';
-        } else {
-            helperText.innerHTML = '<i class="bi bi-info-circle"></i> Ingresa el monto a pagar';
-            helperText.className = 'form-text text-muted';
-        }
-    } else {
-        document.getElementById('vistaPrevia').style.display = 'none';
-    }
-}
-
-// ============================================
-// INICIALIZACIÓN
-// ============================================
 document.addEventListener('DOMContentLoaded', function() {
     const formPago = document.getElementById('formPago');
     const montoInput = document.getElementById('monto');
-    const fechaInput = document.getElementById('fecha_pago');
-    const horaInput = document.getElementById('hora_pago');
     const metodoPagoSelect = document.getElementById('metodo_pago');
     const periodoInput = document.getElementById('periodo');
+    const vistaPrevia = document.getElementById('vistaPrevia');
     const btnSubmit = document.getElementById('btnSubmit');
-    const conceptoRadios = document.querySelectorAll('input[name="concepto_pago"]');
     
-    fechaInput.addEventListener('change', actualizarFecha);
-    horaInput.addEventListener('change', actualizarFecha);
-    
+    // Auto-generar periodo actual como sugerencia
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     const fecha = new Date();
-    const periodoActual = `${MESES[fecha.getMonth()]} ${fecha.getFullYear()}`;
+    const periodoActual = `${meses[fecha.getMonth()]} ${fecha.getFullYear()}`;
     periodoInput.placeholder = `Ej: ${periodoActual}`;
     
+    // Función para actualizar vista previa
+    function actualizarVistaPrevia() {
+        const monto = parseFloat(montoInput.value) || 0;
+        const metodo = metodoPagoSelect.options[metodoPagoSelect.selectedIndex]?.text || 'No especificado';
+        const periodo = periodoInput.value || 'No especificado';
+        
+        if (monto > 0) {
+            document.getElementById('previewMonto').textContent = '$' + monto.toFixed(2);
+            document.getElementById('previewMetodo').textContent = metodo;
+            document.getElementById('previewPeriodo').textContent = periodo;
+            vistaPrevia.style.display = 'block';
+        } else {
+            vistaPrevia.style.display = 'none';
+        }
+    }
+    
+    // Event listeners para vista previa
     montoInput.addEventListener('input', actualizarVistaPrevia);
     metodoPagoSelect.addEventListener('change', actualizarVistaPrevia);
     periodoInput.addEventListener('input', actualizarVistaPrevia);
-    conceptoRadios.forEach(radio => {
-        radio.addEventListener('change', actualizarVistaPrevia);
-    });
     
+    // Validación antes de enviar
     formPago.addEventListener('submit', function(e) {
         const monto = parseFloat(montoInput.value);
-        const fecha = fechaInput.value;
-        const hora = horaInput.value;
-        
-        if (!fecha) {
-            e.preventDefault();
-            alert('❌ Debes seleccionar la FECHA en que se realizó el pago');
-            fechaInput.focus();
-            return false;
-        }
-        
-        if (!hora) {
-            e.preventDefault();
-            alert('❌ Debes especificar la HORA en que se recibió el pago');
-            horaInput.focus();
-            return false;
-        }
         
         if (!monto || monto <= 0) {
             e.preventDefault();
@@ -838,39 +306,22 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
         
-        {% if pago_unico_pendiente %}
-        const montoPagoUnico = {{ monto_pago_unico }};
-        const diferencia = Math.abs(monto - montoPagoUnico);
-        
-        if (diferencia > 0.01 && diferencia < montoPagoUnico * 0.1) {
-            const confirmacion = confirm(
-                `⚠️ ADVERTENCIA\n\n` +
-                `Este estudiante tiene pago único pendiente de $${montoPagoUnico.toFixed(2)}\n` +
-                `Estás registrando: $${monto.toFixed(2)}\n` +
-                `Diferencia: $${diferencia.toFixed(2)}\n\n` +
-                `¿Confirmas que deseas continuar con este monto?`
-            );
-            
-            if (!confirmacion) {
+        // Confirmar si el monto es muy diferente al sugerido
+        const montoSugerido = {{ cliente.curso.precio_mensual if cliente.curso else 0 }};
+        if (montoSugerido > 0 && Math.abs(monto - montoSugerido) > (montoSugerido * 0.5)) {
+            if (!confirm(`⚠️ El monto ingresado ($${monto.toFixed(2)}) es muy diferente a la mensualidad ($${montoSugerido.toFixed(2)}).\n\n¿Deseas continuar?`)) {
                 e.preventDefault();
                 return false;
             }
         }
-        {% endif %}
         
+        // Deshabilitar botón para evitar doble envío
         btnSubmit.disabled = true;
-        btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+        btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Registrando...';
     });
     
-    actualizarFecha();
+    // Inicializar vista previa si hay monto predefinido
     actualizarVistaPrevia();
 });
-
-window.actualizarVistaPrevia = actualizarVistaPrevia;
-window.actualizarFecha = actualizarFecha;
-window.seleccionarConcepto = seleccionarConcepto;
-window.usarMontoPagoUnico = usarMontoPagoUnico;
-window.usarAhora = usarAhora;
-window.usarHoy9AM = usarHoy9AM;
 </script>
 {% endblock %}
