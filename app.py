@@ -1124,16 +1124,33 @@ def curso_eliminar(id):
 @requiere_licencia_y_auth
 def reportes():
     """Página de reportes"""
-    total_estudiantes = Cliente.query.filter_by(activo=True).count()
-    total_pagos = Pago.query.count()
-    
-    estudiantes_activos = Cliente.query.filter_by(activo=True).all()
-    proximos_vencer = [e for e in estudiantes_activos if e.proximo_a_vencer]
-    
-    return render_template('reportes/index.html',
-                         total_estudiantes=total_estudiantes,
-                         total_pagos=total_pagos,
-                         total_proximos_vencer=len(proximos_vencer))
+    try:
+        total_estudiantes = Cliente.query.filter_by(activo=True).count()
+        total_pagos = Pago.query.count()
+        total_cursos = Curso.query.filter_by(activo=True).count()
+
+        estudiantes_activos = Cliente.query.filter_by(activo=True).all()
+        proximos_vencer = [e for e in estudiantes_activos if e.proximo_a_vencer]
+
+        return render_template(
+            'reportes/index.html',
+            total_estudiantes=total_estudiantes,
+            total_pagos=total_pagos,
+            total_proximos_vencer=len(proximos_vencer),
+            total_cursos=total_cursos,
+        )
+    except Exception as e:
+        app.logger.error(f'❌ Error cargando reportes: {e}')
+        import traceback
+        app.logger.error(traceback.format_exc())
+        flash('Error cargando la pantalla de reportes', 'danger')
+        return render_template(
+            'reportes/index.html',
+            total_estudiantes=0,
+            total_pagos=0,
+            total_proximos_vencer=0,
+            total_cursos=0,
+        )
 
 
 @app.route('/reportes/estudiantes/excel')
@@ -2517,12 +2534,48 @@ def pago_nuevo(cliente_id):
                     })
 
             # ===================================
-            # 5. REGISTRAR PAGO
+            # 5. ✅ CAPTURAR FECHA Y HORA DE PAGO (OBLIGATORIAS)
+            # ===================================
+            fecha_pago_str = request.form.get('fecha_pago', '').strip()
+            hora_pago_str = request.form.get('hora_pago', '').strip()
+            
+            # ✅ Validar que se hayan enviado fecha y hora
+            if not fecha_pago_str:
+                flash('❌ Debes seleccionar la FECHA en que se realizó el pago', 'danger')
+                return redirect(url_for('pago_nuevo', cliente_id=cliente_id))
+            
+            if not hora_pago_str:
+                flash('❌ Debes especificar la HORA en que se recibió el pago', 'danger')
+                return redirect(url_for('pago_nuevo', cliente_id=cliente_id))
+            
+            try:
+                # Convertir fecha (YYYY-MM-DD) y hora (HH:MM) a datetime completo
+                fecha_str_completa = f"{fecha_pago_str} {hora_pago_str}"
+                fecha_pago = datetime.strptime(fecha_str_completa, '%Y-%m-%d %H:%M')
+                
+                # ✅ Validar que no sea fecha/hora futura
+                if fecha_pago > datetime.now():
+                    flash('❌ La fecha y hora del pago no pueden ser futuras', 'danger')
+                    return redirect(url_for('pago_nuevo', cliente_id=cliente_id))
+                
+                app.logger.info(
+                    f'📅 Fecha/hora de pago seleccionada: {fecha_pago.strftime("%d/%m/%Y %H:%M")} '
+                    f'(registrado manualmente)'
+                )
+                
+            except ValueError as e:
+                app.logger.error(f'Error parseando fecha/hora: {e}')
+                flash('❌ Formato de fecha u hora inválido. Por favor verifica los datos.', 'danger')
+                return redirect(url_for('pago_nuevo', cliente_id=cliente_id))
+
+            # ===================================
+            # 6. REGISTRAR PAGO (CON FECHA PERSONALIZADA)
             # ===================================
             pago = Pago(
                 cliente_id=cliente_id,
                 monto=monto,
                 concepto=concepto,
+                fecha_pago=fecha_pago,  # ✅ USAR LA FECHA CAPTURADA
                 metodo_pago=(request.form.get('metodo_pago', '') or '').strip() or None,
                 referencia=(request.form.get('referencia', '') or '').strip() or None,
                 notas=(request.form.get('notas', '') or '').strip() or None,
@@ -2532,7 +2585,7 @@ def pago_nuevo(cliente_id):
             db.session.flush()
 
             # ===================================
-            # 5.5 ✅ DETECTAR SI ES PAGO ÚNICO COMPLETO
+            # 7. ✅ DETECTAR SI ES PAGO ÚNICO COMPLETO
             # ===================================
             es_pago_unico_completo = False
             
@@ -2546,14 +2599,14 @@ def pago_nuevo(cliente_id):
                     app.logger.info(f'💰 Pago único completo detectado: ${monto:.2f}')
 
             # ===================================
-            # 6. RECALCULAR COBERTURA (SIEMPRE)
+            # 8. RECALCULAR COBERTURA (SIEMPRE)
             # ===================================
             db.session.flush()
             resultado = _recalcular_cobertura_cliente(cliente)
             db.session.commit()
 
             # ===================================
-            # 7. 🔥 ENVIAR CORREO (PARA TODOS LOS PAGOS)
+            # 9. 🔥 ENVIAR CORREO (PARA TODOS LOS PAGOS)
             # ===================================
             correo_enviado = False
             error_correo = None
@@ -2579,22 +2632,22 @@ def pago_nuevo(cliente_id):
                 app.logger.error(traceback.format_exc())
 
             # ===================================
-            # 8. PREPARAR MENSAJE DE CONFIRMACIÓN
+            # 10. PREPARAR MENSAJE DE CONFIRMACIÓN
             # ===================================
             
             # Estado DESPUÉS del pago
             inscripcion_completa = resultado.get("inscripcion_completa", False)
             meses_despues = int(cliente.mensualidades_canceladas or 0)
-            meses_ganados = max(0, meses_despues - meses_antes)
             carry_despues = resultado.get("carry", 0)
             
             # ✅ Mensaje especial para pago único completo
             if es_pago_unico_completo:
                 mensaje_parts = [
                     f'🎉 ¡PAGO ÚNICO COMPLETO REGISTRADO!',
+                    f'\n📅 Fecha: {fecha_pago.strftime("%d/%m/%Y %H:%M")}',  # ✅ MOSTRAR FECHA
                     f'\n💰 Monto: ${monto:.2f}',
                     f'\n\n📚 Curso: {cliente.curso.nombre}',
-                    f'\n📅 Cobertura total: {cliente.curso.duracion_meses} meses',
+                    f'\n📆 Cobertura total: {cliente.curso.duracion_meses} meses',
                     f'\n🗓️ Vencimiento: {cliente.fecha_fin.strftime("%d/%m/%Y") if cliente.fecha_fin else "N/A"}',
                     f'\n\n✅ Inscripción: COMPLETADA',
                     f'\n✅ Mensualidades: {cliente.curso.duracion_meses} meses PAGADOS'
@@ -2613,7 +2666,10 @@ def pago_nuevo(cliente_id):
                 return redirect(url_for('cliente_detalle', id=cliente_id))
             
             # Construir mensaje normal
-            mensaje_parts = [f'✅ Pago de ${monto:.2f} registrado exitosamente']
+            mensaje_parts = [
+                f'✅ Pago de ${monto:.2f} registrado exitosamente',
+                f'\n📅 Fecha: {fecha_pago.strftime("%d/%m/%Y %H:%M")}'  # ✅ MOSTRAR FECHA
+            ]
             
             # Concepto usado
             concepto_display = {
@@ -2624,35 +2680,11 @@ def pago_nuevo(cliente_id):
             
             mensaje_parts.append(f"\n📋 Concepto: {concepto_display}")
             
-            # Agregar desglose
-            if desglose:
-                mensaje_parts.append("\n\n🧾 Distribución:")
-                for item in desglose:
-                    mensaje_parts.append(f"\n   • {item['descripcion']}")
-            
-            # Estado de inscripción
-            if precio_inscripcion > 0:
-                if inscripcion_completa:
-                    mensaje_parts.append("\n\n✅ Inscripción: COMPLETADA")
-                else:
-                    pendiente = resultado.get("inscripcion_pendiente", 0)
-                    porcentaje = cliente.porcentaje_inscripcion
-                    mensaje_parts.append(
-                        f"\n\n⏳ Inscripción: {porcentaje:.0f}% completado "
-                        f"(Pendiente: ${pendiente:.2f})"
-                    )
-            
             # Cobertura de mensualidades
-            if meses_ganados > 0:
-                mensaje_parts.append(f"\n📅 Cobertura: +{meses_ganados} mes(es)")
+            if meses_despues > 0:
+                mensaje_parts.append(f"\n📆 Cobertura: {meses_despues} mes(es)")
                 if cliente.fecha_fin:
-                    mensaje_parts.append(f"\n🗓️ Nuevo vencimiento: {cliente.fecha_fin.strftime('%d/%m/%Y')}")
-            
-            # Carry acumulado
-            if carry_despues > 0:
-                faltante = precio_mensual - carry_despues
-                mensaje_parts.append(f"\n\n💰 Crédito acumulado: ${carry_despues:.2f}")
-                mensaje_parts.append(f"   Faltan ${faltante:.2f} para completar 1 mensualidad")
+                    mensaje_parts.append(f"\n🗓️ Vencimiento: {cliente.fecha_fin.strftime('%d/%m/%Y')}")
 
             # 🔥 IMPORTANTE: Añadir estado del correo al mensaje
             if correo_enviado:
@@ -2674,12 +2706,11 @@ def pago_nuevo(cliente_id):
             {'='*60}
             👤 Estudiante: {cliente.nombre_completo}
             💵 Monto: ${monto:.2f}
+            📅 Fecha: {fecha_pago.strftime('%d/%m/%Y %H:%M')}
             📋 Concepto: {concepto_display}
-            🧾 Desglose: {', '.join(d['descripcion'] for d in desglose)}
             📊 Resultado:
                - Inscripción: {'✅ Completa' if inscripcion_completa else f'⏳ ${resultado.get("inscripcion_pendiente", 0):.2f} pendiente'}
-               - Mensualidades: {meses_despues} ({'+' + str(meses_ganados) if meses_ganados > 0 else 'sin cambio'})
-               - Carry: ${carry_despues:.2f}
+               - Mensualidades: {meses_despues}
             🗓️ Vencimiento: {cliente.fecha_fin.strftime('%d/%m/%Y') if cliente.fecha_fin else 'N/A'}
             📧 Correo: {'✅ Enviado' if correo_enviado else '❌ No enviado'}
             {'='*60}

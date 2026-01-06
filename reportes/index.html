@@ -1,0 +1,978 @@
+{% extends "base.html" %}
+
+{% block title %}Reportes Excel - Sistema de Mensualidades{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+<div class="page-header">
+    <h2><i class="bi bi-file-earmark-excel-fill text-success"></i> Centro de Reportes Excel Profesionales</h2>
+    <p class="text-muted">Genera reportes empresariales completos en formato Excel con múltiples hojas y análisis detallados</p>
+</div>
+
+<!-- Stats Rápidas -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="stat-card stat-primary">
+            <div class="stat-icon">
+                <i class="bi bi-people-fill"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total Estudiantes</div>
+                <div class="stat-value">{{ total_estudiantes }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="stat-card stat-success">
+            <div class="stat-icon">
+                <i class="bi bi-cash-stack"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Total Pagos</div>
+                <div class="stat-value">{{ total_pagos }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="stat-card stat-warning">
+            <div class="stat-icon">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Próximos a Vencer</div>
+                <div class="stat-value">{{ total_proximos_vencer }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3 mb-3">
+        <div class="stat-card stat-info">
+            <div class="stat-icon">
+                <i class="bi bi-book-fill"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Cursos Activos</div>
+                <div class="stat-value">{{ total_cursos }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 🔥 REPORTE PRINCIPAL - COMPLETO -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="hero-card">
+            <div class="hero-gradient"></div>
+            <div class="hero-content">
+                <div class="row align-items-center">
+                    <div class="col-lg-8 mb-4 mb-lg-0">
+                        <div class="hero-badge">
+                            <i class="bi bi-star-fill"></i> RECOMENDADO
+                        </div>
+                        <h2 class="hero-title mb-3">
+                            <i class="bi bi-file-earmark-spreadsheet-fill"></i>
+                            Reporte Ejecutivo Completo
+                        </h2>
+                        <p class="hero-description mb-4">
+                            Un archivo Excel de nivel empresarial con 5 hojas profesionales, análisis completo 
+                            por categorías y formato premium listo para presentaciones ejecutivas.
+                        </p>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="feature-item">
+                                    <i class="bi bi-graph-up"></i>
+                                    <div>
+                                        <strong>Resumen Ejecutivo</strong>
+                                        <p>KPIs e indicadores clave del negocio</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="feature-item">
+                                    <i class="bi bi-people"></i>
+                                    <div>
+                                        <strong>Registro Completo</strong>
+                                        <p>Todos los estudiantes con estado</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="feature-item">
+                                    <i class="bi bi-receipt"></i>
+                                    <div>
+                                        <strong>Historial Financiero</strong>
+                                        <p>Todos los pagos con totales</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="feature-item">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    <div>
+                                        <strong>Análisis de Cobranza</strong>
+                                        <p>Morosos y vencidos con código de colores</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="feature-item">
+                                    <i class="bi bi-book"></i>
+                                    <div>
+                                        <strong>Análisis por Curso</strong>
+                                        <p>Ocupación e ingresos por programa</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="feature-item">
+                                    <i class="bi bi-check-circle"></i>
+                                    <div>
+                                        <strong>Todo en Uno</strong>
+                                        <p>5 hojas organizadas en un archivo</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 text-center">
+                        <div class="hero-action">
+                            <div class="hero-icon mb-4">
+                                <i class="bi bi-file-earmark-excel-fill"></i>
+                            </div>
+                            <a href="{{ url_for('reporte_completo_excel') }}" 
+                               class="btn btn-hero btn-lg px-5 py-3 shadow-lg">
+                                <i class="bi bi-download"></i>
+                                Descargar Reporte Completo
+                            </a>
+                            <div class="hero-info mt-3">
+                                <i class="bi bi-check-circle-fill"></i> Formato .XLSX
+                            </div>
+                            <div class="hero-info">
+                                <i class="bi bi-lightning-fill"></i> Generación instantánea
+                            </div>
+                            <div class="hero-info">
+                                <i class="bi bi-shield-check"></i> Datos en tiempo real
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Separador -->
+<div class="section-divider">
+    <div class="divider-line"></div>
+    <div class="divider-text">
+        <i class="bi bi-grid-3x3-gap"></i> Hojas Incluidas en el Reporte
+    </div>
+    <div class="divider-line"></div>
+</div>
+
+<!-- Reportes Individuales (Hojas del Excel) -->
+<div class="row g-4">
+    <!-- 1. Resumen Ejecutivo -->
+    <div class="col-lg-4 col-md-6">
+        <div class="report-card h-100">
+            <div class="report-header report-primary">
+                <div class="report-icon">
+                    <i class="bi bi-graph-up"></i>
+                </div>
+                <h4>📊 Resumen Ejecutivo</h4>
+                <p>Indicadores clave del negocio</p>
+            </div>
+            <div class="report-body">
+                <div class="report-features">
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Total estudiantes activos
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Clasificación por estado
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Total recaudado histórico
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Ingresos del mes actual
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Promedio por pago
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Cursos activos
+                    </div>
+                </div>
+                
+                <div class="report-stats">
+                    <div class="stat-item">
+                        <i class="bi bi-speedometer2"></i>
+                        <span>KPIs clave</span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="bi bi-palette-fill"></i>
+                        <span>Código de colores</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 2. Estudiantes -->
+    <div class="col-lg-4 col-md-6">
+        <div class="report-card h-100">
+            <div class="report-header report-success">
+                <div class="report-icon">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+                <h4>👥 Estudiantes</h4>
+                <p>Listado completo con detalles</p>
+            </div>
+            <div class="report-body">
+                <div class="report-features">
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Datos personales completos
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Curso y precio mensual
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Fechas clave (registro, inicio)
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Días restantes de cobertura
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Total pagado por estudiante
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Estado con código de colores
+                    </div>
+                </div>
+                
+                <div class="report-stats">
+                    <div class="stat-item">
+                        <i class="bi bi-file-earmark-spreadsheet"></i>
+                        <span>16 columnas</span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="bi bi-people"></i>
+                        <span>{{ total_estudiantes }} registros</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 3. Pagos -->
+    <div class="col-lg-4 col-md-6">
+        <div class="report-card h-100">
+            <div class="report-header report-info">
+                <div class="report-icon">
+                    <i class="bi bi-cash-stack"></i>
+                </div>
+                <h4>💳 Historial de Pagos</h4>
+                <p>Registro completo de transacciones</p>
+            </div>
+            <div class="report-body">
+                <div class="report-features">
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Fecha y hora exacta
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Estudiante y cédula
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Curso y periodo
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Monto con formato moneda
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Método y referencia
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Total general destacado
+                    </div>
+                </div>
+                
+                <div class="report-stats">
+                    <div class="stat-item">
+                        <i class="bi bi-receipt"></i>
+                        <span>{{ total_pagos }} pagos</span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="bi bi-calculator"></i>
+                        <span>Total automático</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 4. Morosos y Vencidos -->
+    <div class="col-lg-6 col-md-6">
+        <div class="report-card h-100">
+            <div class="report-header report-warning">
+                <div class="report-icon">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                </div>
+                <h4>🚨 Morosos y Vencidos</h4>
+                <p>Análisis de cobranza prioritario</p>
+            </div>
+            <div class="report-body">
+                <div class="report-features">
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Estudiantes sin cobertura
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Cuentas vencidas
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Próximos a vencer (≤7 días)
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Contacto directo (email/teléfono)
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Último pago registrado
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Alertas con código de colores
+                    </div>
+                </div>
+                
+                <div class="alert-legend mt-3">
+                    <div class="legend-title">
+                        <i class="bi bi-palette-fill"></i> Código de Prioridad
+                    </div>
+                    <div class="legend-item legend-urgent">
+                        <span class="legend-badge">🔴</span>
+                        <span><strong>URGENTE:</strong> Vencido o sin cobertura</span>
+                    </div>
+                    <div class="legend-item legend-high">
+                        <span class="legend-badge">🟡</span>
+                        <span><strong>ALERTA:</strong> Por vencer (≤7 días)</span>
+                    </div>
+                </div>
+                
+                <div class="report-stats mt-3">
+                    <div class="stat-item">
+                        <i class="bi bi-bell-fill"></i>
+                        <span>{{ total_proximos_vencer }} alertas</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 5. Análisis por Curso -->
+    <div class="col-lg-6 col-md-6">
+        <div class="report-card h-100">
+            <div class="report-header report-primary">
+                <div class="report-icon">
+                    <i class="bi bi-book-fill"></i>
+                </div>
+                <h4>📚 Análisis por Curso</h4>
+                <p>Ocupación e ingresos por programa</p>
+            </div>
+            <div class="report-body">
+                <div class="report-features">
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Estudiantes activos por curso
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Precio mensual del programa
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Ingreso esperado mensual
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Ingreso real histórico
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Análisis de diferencias
+                    </div>
+                    <div class="feature-badge">
+                        <i class="bi bi-check2-circle"></i> Valor de inscripción
+                    </div>
+                </div>
+                
+                <div class="report-stats mt-3">
+                    <div class="stat-item">
+                        <i class="bi bi-book"></i>
+                        <span>{{ total_cursos }} cursos</span>
+                    </div>
+                    <div class="stat-item">
+                        <i class="bi bi-bar-chart-fill"></i>
+                        <span>Comparativas</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sección de Información -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="info-section">
+            <div class="info-header">
+                <h3>
+                    <i class="bi bi-info-circle-fill"></i>
+                    Características de los Reportes Excel
+                </h3>
+            </div>
+            <div class="row g-4 mt-3">
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <div class="info-icon text-success">
+                            <i class="bi bi-file-earmark-excel-fill"></i>
+                        </div>
+                        <h5>Formato Premium</h5>
+                        <p>Archivos .XLSX con formato profesional, compatibles con Excel, Google Sheets y LibreOffice</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <div class="info-icon text-primary">
+                            <i class="bi bi-palette-fill"></i>
+                        </div>
+                        <h5>Diseño Corporativo</h5>
+                        <p>Colores institucionales, bordes, encabezados formateados y celdas con estilos profesionales</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <div class="info-icon text-warning">
+                            <i class="bi bi-lightning-fill"></i>
+                        </div>
+                        <h5>Datos en Tiempo Real</h5>
+                        <p>Información actualizada al momento de la descarga, directamente desde la base de datos</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="info-card">
+                        <div class="info-icon text-danger">
+                            <i class="bi bi-layers-fill"></i>
+                        </div>
+                        <h5>Multi-Hoja Organizado</h5>
+                        <p>5 hojas especializadas en un solo archivo, con filtros automáticos y formato dinámico</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tips de Uso -->
+<div class="row mt-4 mb-4">
+    <div class="col-md-6">
+        <div class="tip-card">
+            <div class="tip-icon">
+                <i class="bi bi-lightbulb-fill"></i>
+            </div>
+            <div class="tip-content">
+                <h5>💡 Consejo Profesional</h5>
+                <p>El <strong>Reporte Completo</strong> incluye todas las 5 hojas en un solo archivo organizado. 
+                   Cada hoja está optimizada para una función específica: gestión ejecutiva, control académico, 
+                   auditoría financiera, cobranza y análisis por programa.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="tip-card">
+            <div class="tip-icon">
+                <i class="bi bi-clock-history"></i>
+            </div>
+            <div class="tip-content">
+                <h5>⚡ Generación Rápida</h5>
+                <p>Los reportes se generan instantáneamente. Puedes descargarlos cuantas veces necesites 
+                   sin afectar el rendimiento del sistema. Los datos siempre estarán actualizados al momento 
+                   de la descarga.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ===== VARIABLES ===== */
+:root {
+    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+/* ===== STATS CARDS ===== */
+.stat-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.stat-card.stat-primary { border-color: #667eea; }
+.stat-card.stat-success { border-color: #11998e; }
+.stat-card.stat-warning { border-color: #f093fb; }
+.stat-card.stat-info { border-color: #4facfe; }
+
+.stat-icon {
+    width: 70px;
+    height: 70px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: white;
+    flex-shrink: 0;
+}
+
+.stat-primary .stat-icon { background: var(--primary-gradient); }
+.stat-success .stat-icon { background: var(--success-gradient); }
+.stat-warning .stat-icon { background: var(--warning-gradient); }
+.stat-info .stat-icon { background: var(--info-gradient); }
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.3rem;
+}
+
+.stat-value {
+    color: #2c3e50;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* ===== HERO CARD ===== */
+.hero-card {
+    background: white;
+    border-radius: 24px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+    overflow: hidden;
+    position: relative;
+}
+
+.hero-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    pointer-events: none;
+}
+
+.hero-content {
+    padding: 3rem;
+    position: relative;
+    z-index: 1;
+}
+
+.hero-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    color: #000;
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 1rem;
+}
+
+.hero-title {
+    color: #1F4E78;
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+}
+
+.hero-description {
+    color: #495057;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+.feature-item {
+    display: flex;
+    align-items: start;
+    gap: 0.8rem;
+    padding: 0.8rem;
+    background: rgba(102, 126, 234, 0.05);
+    border-radius: 10px;
+}
+
+.feature-item i {
+    color: #667eea;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+    margin-top: 3px;
+}
+
+.feature-item strong {
+    display: block;
+    color: #2c3e50;
+    font-size: 0.95rem;
+    margin-bottom: 0.2rem;
+}
+
+.feature-item p {
+    color: #6c757d;
+    font-size: 0.85rem;
+    margin: 0;
+}
+
+.hero-action {
+    background: white;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+}
+
+.hero-icon {
+    font-size: 4rem;
+    color: #11998e;
+}
+
+.btn-hero {
+    background: var(--success-gradient);
+    border: none;
+    color: white;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+}
+
+.btn-hero:hover {
+    transform: scale(1.05);
+    box-shadow: 0 10px 30px rgba(17, 153, 142, 0.4) !important;
+    color: white;
+}
+
+.hero-info {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.hero-info i {
+    color: #11998e;
+}
+
+/* ===== SECTION DIVIDER ===== */
+.section-divider {
+    display: flex;
+    align-items: center;
+    margin: 3rem 0 2rem;
+    gap: 1rem;
+}
+
+.divider-line {
+    flex: 1;
+    height: 2px;
+    background: linear-gradient(to right, transparent, #dee2e6, transparent);
+}
+
+.divider-text {
+    color: #495057;
+    font-weight: 600;
+    font-size: 1.1rem;
+    white-space: nowrap;
+}
+
+/* ===== REPORT CARDS ===== */
+.report-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.report-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 35px rgba(0,0,0,0.15);
+}
+
+.report-header {
+    padding: 2rem 1.5rem 1.5rem;
+    color: white;
+    text-align: center;
+    position: relative;
+}
+
+.report-primary { background: var(--primary-gradient); }
+.report-success { background: var(--success-gradient); }
+.report-warning { background: var(--warning-gradient); }
+.report-info { background: var(--info-gradient); }
+
+.report-icon {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+    opacity: 0.9;
+}
+
+.report-header h4 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.report-header p {
+    font-size: 0.95rem;
+    opacity: 0.9;
+    margin: 0;
+}
+
+.report-body {
+    padding: 1.5rem;
+}
+
+.report-features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+.feature-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: #495057;
+    padding: 0.4rem 0;
+}
+
+.feature-badge i {
+    color: #11998e;
+    font-size: 1rem;
+}
+
+.report-stats {
+    display: flex;
+    justify-content: space-around;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin-top: 1rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.stat-item i {
+    font-size: 1.3rem;
+    color: #667eea;
+}
+
+.report-footer {
+    padding: 0 1.5rem 1.5rem;
+}
+
+.btn-report {
+    font-weight: 600;
+    padding: 0.8rem 1.5rem;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: none;
+    color: white;
+}
+
+.btn-report-primary { background: var(--primary-gradient); }
+.btn-report-success { background: var(--success-gradient); }
+.btn-report-warning { background: var(--warning-gradient); }
+
+.btn-report:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    color: white;
+}
+
+/* ===== FILTER SECTION ===== */
+.filter-section {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 10px;
+    margin-top: 1rem;
+}
+
+.filter-label {
+    display: block;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+/* ===== ALERT LEGEND ===== */
+.alert-legend {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 10px;
+}
+
+.legend-title {
+    font-weight: 700;
+    color: #495057;
+    margin-bottom: 0.8rem;
+    font-size: 0.9rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.5rem 0;
+    font-size: 0.85rem;
+    color: #495057;
+}
+
+.legend-badge {
+    font-size: 1.2rem;
+}
+
+/* ===== INFO SECTION ===== */
+.info-section {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 20px;
+    padding: 2.5rem;
+}
+
+.info-header h3 {
+    color: #2c3e50;
+    font-weight: 700;
+    font-size: 1.6rem;
+}
+
+.info-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 15px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    text-align: center;
+    height: 100%;
+    transition: all 0.3s ease;
+}
+
+.info-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+
+.info-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.info-card h5 {
+    color: #2c3e50;
+    font-weight: 700;
+    margin-bottom: 0.8rem;
+    font-size: 1.1rem;
+}
+
+.info-card p {
+    color: #6c757d;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* ===== TIP CARDS ===== */
+.tip-card {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    display: flex;
+    gap: 1.2rem;
+    align-items: start;
+    border-left: 4px solid #667eea;
+}
+
+.tip-icon {
+    font-size: 2.5rem;
+    color: #667eea;
+    flex-shrink: 0;
+}
+
+.tip-content h5 {
+    color: #2c3e50;
+    font-weight: 700;
+    margin-bottom: 0.6rem;
+    font-size: 1.1rem;
+}
+
+.tip-content p {
+    color: #6c757d;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin: 0;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .hero-content {
+        padding: 2rem 1.5rem;
+    }
+    
+    .hero-title {
+        font-size: 1.5rem;
+    }
+    
+    .feature-item {
+        font-size: 0.9rem;
+    }
+    
+    .report-features {
+        grid-template-columns: 1fr;
+    }
+    
+    .stat-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .section-divider {
+        flex-direction: column;
+    }
+    
+    .divider-line {
+        width: 100%;
+        height: 2px;
+    }
+}
+</style>
+</div>
+{% endblock %}

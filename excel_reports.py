@@ -342,13 +342,14 @@ class ExcelReportGenerator:
     # 👥 HOJA 2: ESTUDIANTES
     # ============================================
     
+
     def _sheet_estudiantes(self, estudiantes, pagos):
         """Hoja con detalle de todos los estudiantes"""
         ws = self.workbook.create_sheet("👥 Estudiantes")
         self._title_block(ws, "REGISTRO DE ESTUDIANTES", merge_to_col=16)
-        
+    
         pagos_por_cliente = self._pagos_por_cliente(pagos)
-        
+    
         headers = [
             "ID", "Nombre Completo", "Cédula", "Email", "Teléfono", "Curso",
             "Precio/Mes", "F. Registro", "Inicio Clases",
@@ -357,20 +358,30 @@ class ExcelReportGenerator:
             "Total Pagado", "Estado", "Activo"
         ]
         self._apply_table_header(ws, 4, headers)
-        
+    
         row = 5
+    
+        # ✅ VARIABLES PARA TOTALES
+        total_inscripciones = 0.0
+        total_pagado_general = 0.0
+    
         for e in estudiantes:
             curso = getattr(e, "curso", None)
             precio_mensual = _money(getattr(curso, "precio_mensual", 0)) if curso else 0
-            
+        
             # Total pagado por este estudiante
             pagos_cliente = pagos_por_cliente.get(getattr(e, "id", None), [])
             total_pagado = sum(_money(p.monto) for p in pagos_cliente)
-            
+        
+            # ✅ Acumular totales
+            inscripcion_valor = _money(getattr(e, "abono_inscripcion", 0))
+            total_inscripciones += inscripcion_valor
+            total_pagado_general += total_pagado
+        
             # Determinar estado
             dias = getattr(e, "dias_restantes", None)
             mens_canceladas = getattr(e, "mensualidades_canceladas", 0)
-            
+        
             if mens_canceladas == 0:
                 estado = "Sin cobertura"
                 sem = "danger"
@@ -386,14 +397,14 @@ class ExcelReportGenerator:
             else:
                 estado = "Al día"
                 sem = "ok"
-            
+        
             # Construir nombre completo
             nombre_completo = getattr(e, "nombre_completo", "")
             if not nombre_completo:
                 nombre = getattr(e, "nombre", "")
                 apellido = getattr(e, "apellido", "")
                 nombre_completo = f"{nombre} {apellido}".strip()
-            
+        
             values = [
                 getattr(e, "id", ""),
                 nombre_completo,
@@ -407,31 +418,31 @@ class ExcelReportGenerator:
                 getattr(e, "fecha_fin", None),
                 dias if dias is not None else "N/A",
                 mens_canceladas,
-                _money(getattr(e, "valor_inscripcion", 0)),
+                inscripcion_valor,  # ✅ Usar la variable que acumulamos
                 total_pagado,
                 estado,
                 "Sí" if getattr(e, "activo", True) else "No",
             ]
-            
+        
             for c, v in enumerate(values, start=1):
                 cell = ws.cell(row=row, column=c, value=v)
                 cell.border = self.border
                 cell.alignment = self.align_left
                 cell.font = self.font_normal
-                
+            
                 # Alineaciones especiales
                 if c in (1, 11, 12, 16):  # ID, días, mensualidades, activo
                     cell.alignment = self.align_center
                 if c in (7, 13, 14):  # Montos
                     cell.alignment = self.align_right
                     self._currency(cell)
-                
+            
                 # Fechas
                 if c in (8, 9, 10) and v and v != "N/A":
                     if isinstance(v, datetime):
                         cell.value = v.strftime("%d/%m/%Y")
                     cell.alignment = self.align_center
-                
+            
                 # Colorear estado (columna 15)
                 if c == 15 and sem:
                     if sem == "danger":
@@ -458,16 +469,65 @@ class ExcelReportGenerator:
                         )
                         cell.font = Font(bold=True, color="FFFFFF")
                         cell.alignment = self.align_center
-            
-            row += 1
         
+            row += 1
+    
+        # ✅ AGREGAR FILA DE TOTALES
+        row += 1  # Dejar una fila en blanco
+    
+        # Merge las primeras columnas para el texto "TOTALES"
+        ws.merge_cells(f"A{row}:L{row}")
+        total_cell = ws.cell(row=row, column=1, value="TOTALES")
+        total_cell.font = Font(bold=True, size=13)
+        total_cell.fill = PatternFill(
+            start_color=self.colors["total"],
+            end_color=self.colors["total"],
+            fill_type="solid"
+        )
+        total_cell.alignment = self.align_center
+        total_cell.border = self.border
+    
+        # Columna M (13): Total Inscripciones
+        inscripcion_cell = ws.cell(row=row, column=13, value=total_inscripciones)
+        inscripcion_cell.font = Font(bold=True, size=13)
+        inscripcion_cell.fill = PatternFill(
+            start_color=self.colors["total"],
+            end_color=self.colors["total"],
+            fill_type="solid"
+        )
+        inscripcion_cell.alignment = self.align_right
+        inscripcion_cell.border = self.border
+        self._currency(inscripcion_cell)
+    
+        # Columna N (14): Total Pagado
+        pagado_cell = ws.cell(row=row, column=14, value=total_pagado_general)
+        pagado_cell.font = Font(bold=True, size=13)
+        pagado_cell.fill = PatternFill(
+            start_color=self.colors["total"],
+            end_color=self.colors["total"],
+            fill_type="solid"
+        )
+        pagado_cell.alignment = self.align_right
+        pagado_cell.border = self.border
+        self._currency(pagado_cell)
+    
+        # Columnas vacías (15-16)
+        for col in [15, 16]:
+            empty_cell = ws.cell(row=row, column=col)
+            empty_cell.fill = PatternFill(
+                start_color=self.colors["total"],
+                end_color=self.colors["total"],
+                fill_type="solid"
+            )
+            empty_cell.border = self.border
+    
         ws.freeze_panes = "A5"
-        ws.auto_filter.ref = f"A4:{get_column_letter(len(headers))}{max(4, row-1)}"
+        ws.auto_filter.ref = f"A4:{get_column_letter(len(headers))}{max(4, row-2)}"
         self._set_col_widths_auto(ws)
     
-    # ============================================
-    # 💳 HOJA 3: PAGOS
-    # ============================================
+        # ============================================
+        # 💳 HOJA 3: PAGOS
+        # ============================================
     
     def _sheet_pagos(self, pagos):
         """Hoja con historial completo de pagos"""
