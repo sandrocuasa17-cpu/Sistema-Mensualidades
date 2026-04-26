@@ -1,0 +1,109 @@
+{# templates/docentes/mis_grupos.html — Vista del Docente: sus grupos agrupados por categoría #}
+{% extends "base.html" %}
+
+{% block title %}Mis Grupos — {{ docente.nombre_completo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+    {# Encabezado #}
+    <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+             style="width:52px;height:52px;font-size:1.5rem;">
+            <i class="bi bi-person-badge-fill"></i>
+        </div>
+        <div>
+            <h4 class="fw-bold mb-0">Bienvenido/a, {{ docente.nombre }}</h4>
+            <span class="text-muted small">
+                {% if docente.materia %}<i class="bi bi-book me-1"></i>{{ docente.materia }}{% endif %}
+                {% if docente.proyecto %} · {{ docente.proyecto }}{% endif %}
+                &nbsp;|&nbsp;<span class="text-success fw-semibold">${{ '%.2f'|format(docente.valor_hora) }}/hora</span>
+            </span>
+        </div>
+        <div class="ms-auto d-flex gap-2 flex-wrap">
+            <a href="{{ url_for('docente_mis_horas') }}" class="btn btn-success btn-sm">
+                <i class="bi bi-clock-fill me-1"></i>Mis Horas
+            </a>
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-box-arrow-right me-1"></i>Cerrar sesión
+            </a>
+        </div>
+    </div>
+
+    {# Flash messages #}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% if categorias_con_grupos %}
+
+    {# Una sección por categoría (institución/programa) #}
+    {% for categoria, grupos in categorias_con_grupos %}
+    <div class="mb-5">
+        {# Encabezado de categoría #}
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <div class="px-3 py-2 rounded-3 text-white fw-bold"
+                 style="background: linear-gradient(135deg,#667eea,#764ba2); font-size:.85rem; letter-spacing:.5px;">
+                <i class="bi bi-building me-1"></i>{{ categoria.nombre | upper }}
+            </div>
+            <span class="text-muted small">{{ grupos|length }} grupo(s)</span>
+        </div>
+
+        <div class="row g-3">
+            {% for grupo in grupos %}
+            {% set inscritos = grupo.estudiantes|selectattr('activo')|list|length %}
+            <div class="col-md-4 col-lg-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body pb-2">
+                        <h6 class="fw-bold mb-1">
+                            <i class="bi bi-people-fill text-primary me-1"></i>{{ grupo.nombre }}
+                        </h6>
+                        {% if grupo.descripcion %}
+                        <p class="text-muted small mb-2">{{ grupo.descripcion }}</p>
+                        {% endif %}
+                        <div class="text-muted small mb-3">
+                            <i class="bi bi-person-lines-fill me-1"></i>{{ inscritos }} estudiante(s)
+                        </div>
+                    </div>
+                    <div class="card-footer bg-transparent pt-0 d-grid gap-2">
+                        <a href="{{ url_for('docente_pase_lista', grupo_id=grupo.id) }}"
+                           class="btn btn-primary btn-sm">
+                            <i class="bi bi-check2-square me-1"></i>Pasar lista hoy
+                        </a>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('docente_mis_horas', grupo_id=grupo.id) }}"
+                               class="btn btn-success btn-sm flex-fill"
+                               title="Registrar horas para este grupo">
+                                <i class="bi bi-clock-fill me-1"></i>Registrar horas
+                            </a>
+                            <a href="{{ url_for('asistencia_reporte', grupo_id=grupo.id) }}"
+                               class="btn btn-outline-info btn-sm flex-fill"
+                               title="Ver reporte de asistencia">
+                                <i class="bi bi-bar-chart-fill"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    {% else %}
+    <div class="text-center py-5 text-muted">
+        <i class="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>
+        <p class="fs-5">No tienes grupos asignados por el momento.</p>
+        <small>El administrador debe asignarte grupos desde el panel de asistencia.</small>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

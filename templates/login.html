@@ -7,153 +7,341 @@
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
     
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --admin-from: #1a1a2e;
+            --admin-to: #16213e;
+            --admin-accent: #e94560;
+            --docente-from: #0f3460;
+            --docente-to: #533483;
+            --docente-accent: #f5a623;
+            --surface: #ffffff;
+            --text-main: #1a1a2e;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+            --radius: 16px;
         }
-        
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'DM Sans', sans-serif;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
-        }
-        
-        .login-container {
-            max-width: 450px;
-            width: 100%;
-        }
-        
-        .login-card {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
+            background: var(--admin-from);
+            transition: background 0.5s ease;
+            position: relative;
             overflow: hidden;
         }
-        
-        .login-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 40px 30px;
-            text-align: center;
-            color: white;
+
+        /* Fondo animado */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse at 20% 50%, rgba(233,69,96,0.15) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(22,33,62,0.8) 0%, transparent 60%);
+            pointer-events: none;
+            transition: opacity 0.5s;
         }
-        
-        .login-icon {
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 255, 255, 0.2);
+
+        body.mode-docente::before {
+            background:
+                radial-gradient(ellipse at 20% 50%, rgba(245,166,35,0.15) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(83,52,131,0.8) 0%, transparent 60%);
+        }
+
+        /* Partículas de fondo */
+        .bg-particles {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .particle {
+            position: absolute;
             border-radius: 50%;
+            opacity: 0.08;
+            animation: float linear infinite;
+        }
+        @keyframes float {
+            from { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10%  { opacity: 0.08; }
+            90%  { opacity: 0.08; }
+            to   { transform: translateY(-10vh) rotate(360deg); opacity: 0; }
+        }
+
+        /* Card principal */
+        .login-wrapper {
+            width: 100%;
+            max-width: 440px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .login-card {
+            background: var(--surface);
+            border-radius: 24px;
+            box-shadow: 0 32px 80px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
+            overflow: hidden;
+            animation: cardIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+        }
+        @keyframes cardIn {
+            from { opacity: 0; transform: translateY(40px) scale(0.95); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* Header */
+        .login-header {
+            padding: 36px 32px 28px;
+            background: linear-gradient(135deg, var(--admin-from), var(--admin-to));
+            position: relative;
+            overflow: hidden;
+            transition: background 0.5s;
+        }
+        .mode-docente .login-header {
+            background: linear-gradient(135deg, var(--docente-from), var(--docente-to));
+        }
+        .login-header::after {
+            content: '';
+            position: absolute;
+            bottom: -30px; right: -30px;
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .header-icon {
+            width: 64px; height: 64px;
+            border-radius: 18px;
+            background: rgba(255,255,255,0.12);
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255,255,255,0.15);
+            transition: all 0.4s;
+        }
+        .header-icon i { font-size: 28px; color: white; transition: all 0.4s; }
+
+        .login-header h1 {
+            font-family: 'DM Serif Display', serif;
+            font-size: 26px;
+            color: white;
+            margin-bottom: 4px;
+            letter-spacing: -0.3px;
+        }
+        .login-header p {
+            color: rgba(255,255,255,0.65);
+            font-size: 13px;
+            font-weight: 400;
+        }
+
+        /* Toggle de modo */
+        .mode-toggle {
+            display: flex;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 4px;
+            margin-top: 20px;
+            width: fit-content;
+        }
+        .mode-btn {
+            padding: 7px 18px;
+            border-radius: 9px;
+            border: none;
+            font-size: 13px;
+            font-weight: 600;
+            font-family: 'DM Sans', sans-serif;
+            color: rgba(255,255,255,0.6);
+            background: transparent;
+            cursor: pointer;
+            transition: all 0.3s;
             display: flex;
             align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
+            gap: 6px;
         }
-        
-        .login-icon i {
-            font-size: 40px;
+        .mode-btn.active {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
-        
-        .login-header h2 {
-            margin: 0;
-            font-size: 28px;
-            font-weight: 700;
+        .mode-btn:hover:not(.active) {
+            color: rgba(255,255,255,0.85);
         }
-        
-        .login-header p {
-            margin: 10px 0 0;
-            opacity: 0.9;
-            font-size: 14px;
-        }
-        
+
+        /* Body del formulario */
         .login-body {
-            padding: 40px 30px;
+            padding: 28px 32px 32px;
         }
-        
-        .form-label {
+
+        /* Campos del formulario */
+        .field-group {
+            margin-bottom: 18px;
+        }
+        .field-group label {
+            display: block;
+            font-size: 13px;
             font-weight: 600;
-            color: #2d3748;
+            color: var(--text-main);
             margin-bottom: 8px;
         }
-        
-        .form-control {
-            border-radius: 10px;
-            border: 2px solid #e0e0e0;
-            padding: 12px 15px;
-            font-size: 15px;
-            transition: all 0.3s;
+        .input-wrapper {
+            position: relative;
         }
-        
-        .form-control:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-        
-        .btn-login {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 14px;
-            border-radius: 10px;
+        .input-wrapper i {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
             font-size: 16px;
-            font-weight: 700;
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+        .input-wrapper input {
             width: 100%;
-            transition: all 0.3s;
-            margin-top: 20px;
+            padding: 12px 14px 12px 42px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: 'DM Sans', sans-serif;
+            color: var(--text-main);
+            background: #f9fafb;
+            transition: all 0.25s;
+            outline: none;
         }
-        
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        .input-wrapper input:focus {
+            border-color: var(--admin-accent);
+            background: white;
+            box-shadow: 0 0 0 4px rgba(233,69,96,0.1);
         }
-        
-        .alert {
-            border-radius: 10px;
-            border: none;
-            padding: 15px;
+        .mode-docente .input-wrapper input:focus {
+            border-color: var(--docente-accent);
+            box-shadow: 0 0 0 4px rgba(245,166,35,0.12);
         }
-        
-        .info-footer {
-            text-align: center;
-            padding: 20px;
+        .input-wrapper input:focus + i,
+        .input-wrapper:focus-within i {
+            color: var(--admin-accent);
+        }
+        .mode-docente .input-wrapper:focus-within i {
+            color: var(--docente-accent);
+        }
+
+        /* Campo email — oculto por defecto (modo admin) */
+        .field-email {
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+        .field-email.visible {
+            display: block;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Separador visual */
+        .mode-hint {
             background: #f8f9fa;
-            color: #666;
-            font-size: 13px;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid var(--border);
         }
-        
-        @media (max-width: 576px) {
-            .login-header {
-                padding: 30px 20px;
-            }
-            
-            .login-body {
-                padding: 30px 20px;
-            }
-            
-            .login-header h2 {
-                font-size: 24px;
-            }
+        .mode-hint i { font-size: 14px; }
+
+        /* Botón de submit */
+        .btn-submit {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: 'DM Sans', sans-serif;
+            color: white;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, var(--admin-from), var(--admin-accent));
+            transition: all 0.3s;
+            margin-top: 4px;
+        }
+        .mode-docente .btn-submit {
+            background: linear-gradient(135deg, var(--docente-from), var(--docente-accent));
+        }
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+        }
+        .btn-submit:active { transform: translateY(0); }
+
+        /* Alertas */
+        .alert {
+            border-radius: 12px;
+            border: none;
+            font-size: 14px;
+            padding: 12px 16px;
+            margin-bottom: 18px;
+        }
+
+        /* Footer */
+        .login-footer {
+            text-align: center;
+            padding: 16px 32px 20px;
+            border-top: 1px solid var(--border);
+        }
+        .login-footer p {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 480px) {
+            .login-header { padding: 28px 24px 22px; }
+            .login-body   { padding: 22px 24px 28px; }
+            .login-footer { padding: 14px 24px 18px; }
         }
     </style>
 </head>
-<body>
-    <div class="login-container">
+<body id="mainBody">
+
+    <!-- Partículas decorativas -->
+    <div class="bg-particles" id="particles"></div>
+
+    <div class="login-wrapper">
         <div class="login-card">
+
             <div class="login-header">
-                <div class="login-icon">
-                    <i class="bi bi-shield-lock-fill"></i>
+                <div class="header-icon" id="headerIcon">
+                    <i class="bi bi-shield-lock-fill" id="headerIconI"></i>
                 </div>
-                <h2>Acceso al Sistema</h2>
-                <p>Sistema de Gestión de Mensualidades</p>
+                <h1 id="headerTitle">Acceso al Sistema</h1>
+                <p id="headerSubtitle">Sistema de Gestión de Mensualidades</p>
+
+                <!-- Toggle Admin / Docente -->
+                <div class="mode-toggle">
+                    <button class="mode-btn active" id="btnAdmin" onclick="setMode('admin')">
+                        <i class="bi bi-person-gear"></i> Admin
+                    </button>
+                    <button class="mode-btn" id="btnDocente" onclick="setMode('docente')">
+                        <i class="bi bi-person-badge"></i> Docente
+                    </button>
+                </div>
             </div>
-            
+
             <div class="login-body">
+
+                <!-- Mensajes flash de Flask -->
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
                         {% for category, message in messages %}
@@ -164,49 +352,129 @@
                         {% endfor %}
                     {% endif %}
                 {% endwith %}
-                
+
+                <!-- Hint contextual -->
+                <div class="mode-hint" id="modeHint">
+                    <i class="bi bi-info-circle"></i>
+                    <span id="modeHintText">Ingresa la contraseña de administrador para continuar.</span>
+                </div>
+
                 <form method="POST" id="loginForm">
-                    <div class="mb-3">
-                        <label for="password" class="form-label">
-                            <i class="bi bi-key-fill"></i> Contraseña
-                        </label>
-                        <input type="password" 
-                               class="form-control" 
-                               id="password" 
-                               name="password"
-                               placeholder="Ingresa tu contraseña"
-                               required
-                               autofocus>
+
+                    <!-- Campo Email — solo visible en modo Docente -->
+                    <div class="field-group field-email" id="fieldEmail">
+                        <label for="email">Correo electrónico</label>
+                        <div class="input-wrapper">
+                            <input type="email"
+                                   id="email"
+                                   name="email"
+                                   placeholder="tu@correo.com"
+                                   autocomplete="email">
+                            <i class="bi bi-envelope-fill"></i>
+                        </div>
                     </div>
-                    
-                    <button type="submit" class="btn btn-login">
-                        <i class="bi bi-box-arrow-in-right"></i> Iniciar Sesión
+
+                    <!-- Campo Contraseña — siempre visible -->
+                    <div class="field-group">
+                        <label for="password">Contraseña</label>
+                        <div class="input-wrapper">
+                            <input type="password"
+                                   id="password"
+                                   name="password"
+                                   placeholder="••••••••"
+                                   required
+                                   autocomplete="current-password"
+                                   autofocus>
+                            <i class="bi bi-key-fill"></i>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-submit" id="btnSubmit">
+                        <i class="bi bi-box-arrow-in-right"></i>
+                        <span id="btnText"> Iniciar Sesión</span>
                     </button>
                 </form>
             </div>
-            
-            <div class="info-footer">
-                <p class="mb-0">
-                    <i class="bi bi-info-circle"></i> 
-                    Solo personal autorizado
-                </p>
-                <p class="mb-0 mt-1">
-                    <small>&copy; 2025 Sistema de Mensualidades</small>
-                </p>
+
+            <div class="login-footer">
+                <p><i class="bi bi-lock-fill"></i> Solo personal autorizado &nbsp;·&nbsp; &copy; 2026 Sistema de Mensualidades</p>
             </div>
+
         </div>
     </div>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Auto-cerrar alertas después de 5 segundos
+        // ── Partículas de fondo ───────────────────────────────
+        (function() {
+            const container = document.getElementById('particles');
+            const colors = ['#e94560','#ffffff','#16213e'];
+            for (let i = 0; i < 18; i++) {
+                const el = document.createElement('div');
+                el.className = 'particle';
+                const size = Math.random() * 60 + 20;
+                el.style.cssText = `
+                    width: ${size}px; height: ${size}px;
+                    left: ${Math.random() * 100}%;
+                    background: ${colors[Math.floor(Math.random() * colors.length)]};
+                    animation-duration: ${Math.random() * 20 + 15}s;
+                    animation-delay: ${Math.random() * -20}s;
+                `;
+                container.appendChild(el);
+            }
+        })();
+
+        // ── Toggle de modo ────────────────────────────────────
+        let currentMode = 'admin';
+
+        function setMode(mode) {
+            currentMode = mode;
+            const body      = document.getElementById('mainBody');
+            const btnAdmin  = document.getElementById('btnAdmin');
+            const btnDoc    = document.getElementById('btnDocente');
+            const fieldEmail = document.getElementById('fieldEmail');
+            const hintText  = document.getElementById('modeHintText');
+            const iconEl    = document.getElementById('headerIconI');
+            const titleEl   = document.getElementById('headerTitle');
+            const subtitleEl = document.getElementById('headerSubtitle');
+            const emailInput = document.getElementById('email');
+
+            if (mode === 'docente') {
+                body.className = 'mode-docente';
+                btnAdmin.classList.remove('active');
+                btnDoc.classList.add('active');
+                fieldEmail.classList.add('visible');
+                emailInput.required = true;
+                hintText.textContent = 'Ingresa tu correo institucional y contraseña de docente.';
+                iconEl.className = 'bi bi-person-badge-fill';
+                titleEl.textContent = 'Acceso Docente';
+                subtitleEl.textContent = 'Pase de lista y gestión de grupos';
+            } else {
+                body.className = '';
+                btnAdmin.classList.add('active');
+                btnDoc.classList.remove('active');
+                fieldEmail.classList.remove('visible');
+                emailInput.required = false;
+                emailInput.value = '';
+                hintText.textContent = 'Ingresa la contraseña de administrador para continuar.';
+                iconEl.className = 'bi bi-shield-lock-fill';
+                titleEl.textContent = 'Acceso al Sistema';
+                subtitleEl.textContent = 'Sistema de Gestión de Mensualidades';
+            }
+        }
+
+        // Auto-cerrar alertas después de 5 s
         setTimeout(function() {
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(alert => {
-                const bsAlert = new bootstrap.Alert(alert);
-                bsAlert.close();
+            document.querySelectorAll('.alert').forEach(function(alert) {
+                new bootstrap.Alert(alert).close();
             });
         }, 5000);
+
+        // Si hay un campo email pre-llenado (tras error de Flask), activar modo docente
+        window.addEventListener('DOMContentLoaded', function() {
+            const emailVal = document.getElementById('email').value;
+            if (emailVal) setMode('docente');
+        });
     </script>
 </body>
 </html>

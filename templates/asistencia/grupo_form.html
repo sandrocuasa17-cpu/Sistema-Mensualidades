@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Editar' if grupo else 'Nuevo' }} Grupo{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+
+      <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('asistencia_grupos') }}" class="btn btn-outline-secondary btn-sm me-3">
+          <i class="bi bi-arrow-left"></i>
+        </a>
+        <h3 class="mb-0">
+          <i class="bi bi-calendar2-check-fill text-primary me-2"></i>
+          {{ 'Editar Grupo' if grupo else 'Nuevo Grupo' }}
+        </h3>
+      </div>
+
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+          <form method="POST">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Categoría <span class="text-danger">*</span></label>
+              <select name="categoria_id" class="form-select" required>
+                <option value="">— Selecciona una categoría —</option>
+                {% for cat in categorias %}
+                <option value="{{ cat.id }}"
+                  {{ 'selected' if grupo and grupo.categoria_id == cat.id }}
+                  {{ 'selected' if request.args.get('categoria_id')|int == cat.id }}>
+                  {{ cat.nombre }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Nombre del grupo <span class="text-danger">*</span></label>
+              <input type="text" name="nombre" class="form-control"
+                     value="{{ grupo.nombre if grupo else '' }}"
+                     placeholder="Ej: Grupo A, Tarde, Sábados..." required autofocus>
+            </div>
+            <div class="mb-4">
+              <label class="form-label fw-semibold">Descripción</label>
+              <textarea name="descripcion" class="form-control" rows="2"
+                        placeholder="Descripción opcional...">{{ grupo.descripcion if grupo else '' }}</textarea>
+            </div>
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary flex-fill">
+                <i class="bi bi-check-circle-fill me-1"></i>
+                {{ 'Guardar cambios' if grupo else 'Crear grupo' }}
+              </button>
+              <a href="{{ url_for('asistencia_grupos') }}" class="btn btn-outline-secondary">
+                Cancelar
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

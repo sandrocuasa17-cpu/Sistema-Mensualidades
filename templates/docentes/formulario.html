@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Editar' if docente else 'Nuevo' }} Docente{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-md-7">
+
+      <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('docentes_lista') }}" class="btn btn-outline-secondary btn-sm me-3">
+          <i class="bi bi-arrow-left"></i>
+        </a>
+        <h3 class="mb-0">
+          <i class="bi bi-person-badge-fill text-primary me-2"></i>
+          {{ 'Editar Docente' if docente else 'Nuevo Docente' }}
+        </h3>
+      </div>
+
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+          <form method="POST">
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Nombre <span class="text-danger">*</span></label>
+                <input type="text" name="nombre" class="form-control"
+                       value="{{ docente.nombre if docente else '' }}" required autofocus>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Apellido <span class="text-danger">*</span></label>
+                <input type="text" name="apellido" class="form-control"
+                       value="{{ docente.apellido if docente else '' }}" required>
+              </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
+                <input type="email" name="email" class="form-control"
+                       value="{{ docente.email if docente else '' }}" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Cédula</label>
+                <input type="text" name="cedula" class="form-control"
+                       value="{{ docente.cedula if docente else '' }}">
+              </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Materia principal</label>
+                <input type="text" name="materia" class="form-control"
+                       value="{{ docente.materia if docente else '' }}"
+                       placeholder="Ej: Matemáticas, Lenguaje...">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Proyecto</label>
+                <input type="text" name="proyecto" class="form-control"
+                       value="{{ docente.proyecto if docente else '' }}"
+                       placeholder="Ej: Preuniversitario, Refuerzo...">
+              </div>
+            </div>
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Teléfono</label>
+                <input type="text" name="telefono" class="form-control"
+                       value="{{ docente.telefono if docente else '' }}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Valor por hora ($) <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <span class="input-group-text">$</span>
+                  <input type="number" name="valor_hora" class="form-control" step="0.01" min="0"
+                         value="{{ '%.2f'|format(docente.valor_hora) if docente else '0.00' }}" required>
+                </div>
+              </div>
+            </div>
+
+            <!-- ── Asignación de grupos ── -->
+            {% if grupos_disponibles %}
+            <div class="mb-4">
+              <label class="form-label fw-semibold">
+                <i class="bi bi-calendar2-check-fill text-primary me-1"></i>
+                Grupos asignados
+              </label>
+              <div class="border rounded p-3" style="max-height:220px; overflow-y:auto; background:#f8f9fa;">
+                {% if grupos_disponibles %}
+                  {% for grupo in grupos_disponibles %}
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox"
+                           name="grupos_ids" value="{{ grupo.id }}"
+                           id="grupo_{{ grupo.id }}"
+                           {% if docente and grupo.id in grupos_asignados_ids %}checked{% endif %}>
+                    <label class="form-check-label small" for="grupo_{{ grupo.id }}">
+                      <span class="badge bg-secondary me-1">{{ grupo.categoria.nombre }}</span>
+                      {{ grupo.nombre }}
+                    </label>
+                  </div>
+                  {% endfor %}
+                {% else %}
+                  <p class="text-muted small mb-0">No hay grupos creados aún.</p>
+                {% endif %}
+              </div>
+              <small class="text-muted">Selecciona los grupos que dictará este docente. Puede modificarse después.</small>
+            </div>
+            {% endif %}
+
+            <div class="mb-4">
+              <label class="form-label fw-semibold">
+                Contraseña {% if not docente %}<span class="text-danger">*</span>{% endif %}
+              </label>
+              <input type="password" name="password" class="form-control"
+                     placeholder="{{ 'Nueva contraseña (dejar vacío para no cambiar)' if docente else 'Contraseña de acceso (mín. 6 caracteres)' }}"
+                     {{ 'required' if not docente }}>
+              {% if not docente %}
+              <small class="text-muted">El docente usará esta contraseña para registrar asistencia. Por defecto: <code>123456</code></small>
+              {% else %}
+              <small class="text-muted">Dejar vacío para mantener la contraseña actual.</small>
+              {% endif %}
+            </div>
+
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary flex-fill">
+                <i class="bi bi-check-circle-fill me-1"></i>
+                {{ 'Guardar cambios' if docente else 'Registrar docente' }}
+              </button>
+              <a href="{{ url_for('docentes_lista') }}" class="btn btn-outline-secondary">Cancelar</a>
+            </div>
+
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

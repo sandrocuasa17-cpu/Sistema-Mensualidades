@@ -1,0 +1,187 @@
+{% extends 'base.html' %}
+{% block title %}Mis Horas — {{ docente.nombre_completo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <a href="{{ url_for('docente_mi_lista') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <div>
+        <h3 class="mb-0"><i class="bi bi-clock-fill text-success me-2"></i>Mis Horas</h3>
+        <small class="text-muted">
+          <strong>{{ docente.nombre_completo }}</strong>
+          {% if docente.materia %} — {{ docente.materia }}{% endif %}
+          &nbsp;| Valor/hora: <strong class="text-success">${{ '%.2f'|format(docente.valor_hora) }}</strong>
+        </small>
+      </div>
+    </div>
+
+    <!-- Selector mes/año -->
+    <form method="GET" class="d-flex gap-2 align-items-center flex-wrap">
+      <select name="mes" class="form-select form-select-sm" style="width:130px" onchange="this.form.submit()">
+        {% for m,n in [(1,'Enero'),(2,'Febrero'),(3,'Marzo'),(4,'Abril'),(5,'Mayo'),(6,'Junio'),
+                       (7,'Julio'),(8,'Agosto'),(9,'Septiembre'),(10,'Octubre'),(11,'Noviembre'),(12,'Diciembre')] %}
+        <option value="{{ m }}" {{ 'selected' if m == mes }}>{{ n }}</option>
+        {% endfor %}
+      </select>
+      <select name="anio" class="form-select form-select-sm" style="width:90px" onchange="this.form.submit()">
+        {% for y in range(now().year - 1, now().year + 2) %}
+        <option value="{{ y }}" {{ 'selected' if y == anio }}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- Formulario registro -->
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-transparent">
+          <h5 class="mb-0"><i class="bi bi-plus-circle-fill text-primary me-2"></i>Registrar horas</h5>
+        </div>
+        <div class="card-body">
+          <form method="POST">
+            <input type="hidden" name="mes_actual" value="{{ mes }}">
+            <input type="hidden" name="anio_actual" value="{{ anio }}">
+
+            {% if mis_grupos %}
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Grupo <span class="text-danger">*</span></label>
+              <select name="grupo_id_form" class="form-select" required>
+                <option value="">— Selecciona el grupo —</option>
+                {% for g in mis_grupos %}
+                <option value="{{ g.id }}"
+                  {{ 'selected' if grupo_pre and grupo_pre.id == g.id }}>
+                  {{ g.categoria.nombre }} · {{ g.nombre }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            {% endif %}
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Fecha <span class="text-danger">*</span></label>
+              <input type="date" name="fecha" class="form-control"
+                     value="{{ now().strftime('%Y-%m-%d') }}"
+                     max="{{ now().strftime('%Y-%m-%d') }}" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Horas dictadas <span class="text-danger">*</span></label>
+              <input type="number" name="horas_dictadas" class="form-control"
+                     step="0.5" min="0.5" max="12" placeholder="Ej: 2.5" required>
+              <small class="text-muted">Puede usar medias horas (0.5)</small>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Materia</label>
+              <input type="text" name="materia" class="form-control"
+                     value="{{ docente.materia or '' }}"
+                     placeholder="{{ docente.materia or 'Materia...' }}">
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Notas</label>
+              <textarea name="notas" class="form-control" rows="2" placeholder="Observaciones..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-plus-circle-fill me-1"></i> Registrar
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Resumen del mes -->
+      <div class="card shadow-sm border-0 mt-3">
+        <div class="card-body text-center">
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="p-3 rounded" style="background:#f8f9fa">
+                <div class="fs-4 fw-bold text-primary">{{ '%.1f'|format(total_horas) }}</div>
+                <small class="text-muted">horas del mes</small>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-3 rounded" style="background:#f8f9fa">
+                <div class="fs-4 fw-bold text-success">${{ '%.2f'|format(total_pago) }}</div>
+                <small class="text-muted">a cobrar</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabla de registros -->
+    <div class="col-md-8">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">
+            {{ ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][mes-1] }} {{ anio }}
+          </h5>
+          <span class="badge bg-secondary">{{ registros|length }} registro(s)</span>
+        </div>
+
+        {% if registros %}
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Fecha</th>
+                <th>Grupo</th>
+                <th class="text-center">Horas</th>
+                <th>Materia</th>
+                <th class="text-end">Pago ($)</th>
+                <th>Notas</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for reg in registros %}
+              <tr>
+                <td>{{ reg.fecha.strftime('%d/%m/%Y') }}</td>
+                <td>
+                  {% if reg.grupo_id %}
+                    {% set grp = mis_grupos|selectattr('id','equalto',reg.grupo_id)|first %}
+                    {% if grp %}<small class="badge bg-secondary">{{ grp.nombre }}</small>{% else %}—{% endif %}
+                  {% else %}—{% endif %}
+                </td>
+                <td class="text-center fw-bold">{{ '%.1f'|format(reg.horas_dictadas) }}h</td>
+                <td>{{ reg.materia or '—' }}</td>
+                <td class="text-end text-success fw-bold">${{ '%.2f'|format(reg.pago_calculado) }}</td>
+                <td><small class="text-muted">{{ reg.notas or '' }}</small></td>
+                <td>
+                  <form action="{{ url_for('docente_hora_eliminar', reg_id=reg.id) }}" method="POST"
+                        onsubmit="return confirm('¿Eliminar este registro?')">
+                    <button class="btn btn-sm btn-outline-danger">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-warning">
+              <tr>
+                <td class="fw-bold">TOTAL</td>
+                <td class="fw-bold text-center">{{ '%.1f'|format(total_horas) }}h</td>
+                <td colspan="2" class="fw-bold text-success text-end">${{ '%.2f'|format(total_pago) }}</td>
+                <td colspan="2"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        {% else %}
+        <div class="card-body text-center py-4 text-muted">
+          <i class="bi bi-clock" style="font-size:3rem;opacity:.3"></i>
+          <p class="mt-2">No hay registros para este mes.</p>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

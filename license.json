@@ -1,0 +1,12 @@
+{
+  "license_key": "POS-16AB-F20F-F64C-43E6",
+  "license_data": "eyJjbGllbnRlX25vbWJyZSI6ICJzYW5kZXIiLCAiY2xpZW50ZV9lbWFpbCI6ICJzYW5kZXJAZ21haWwuY29tIiwgInRva2VuIjogImVlYjE5ZWRhMTQwYjI1OGEzMjIyNzJhNmFmYjk0MjM2Y2E5OWJkOTRjNWM4YmYzMzcxYmU5ODJlNmUxMGI4ODYiLCAiZmVjaGFfZW1pc2lvbiI6ICIyMDI2LTA0LTI1IDIwOjE2OjE3IiwgImZlY2hhX2V4cGlyYWNpb24iOiAiMjAyNi0wNS0yNSAyMDoxNjoxNyIsICJkdXJhY2lvbl9kaWFzIjogMzAsICJ2ZXJzaW9uIjogIjIuMSIsICJhY3RpdmFjaW9uZXNfcGVybWl0aWRhcyI6IDEsICJlc3RhZG8iOiAiYWN0aXZhZGEiLCAiaGFyZHdhcmVfaWQiOiAiNzhkOGU0NDI0NWVjNjFiOGNmZmJjMTVjYmJmMTcyMjA5OThlMGNmZTc2NGM0MTlkYzJlZjZhMGQwODVlMmVlMSIsICJmZWNoYV9hY3RpdmFjaW9uIjogIjIwMjYtMDQtMjUgMjA6MTc6MTIifQ==",
+  "hardware_id": "78d8e44245ec61b8cffbc15cbbf17220998e0cfe764c419dc2ef6a0d085e2ee1",
+  "activacion_fecha": "2026-04-25 20:17:12",
+  "cliente_nombre": "sander",
+  "cliente_email": "sander@gmail.com",
+  "fecha_expiracion": "2026-05-25 20:16:17",
+  "version": "2.2",
+  "checksum": "1144e1b15f36758ca306b5b4970e8885",
+  "tiene_datos_empresa": false
+}

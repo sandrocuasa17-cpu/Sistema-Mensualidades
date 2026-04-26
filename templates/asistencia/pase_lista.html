@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+{% block title %}Pase de Lista — {{ grupo.nombre }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.estado-btn { min-width: 40px; font-size: 13px; }
+.estado-btn.activo-P { background: #198754; color: #fff; border-color: #198754; }
+.estado-btn.activo-A { background: #dc3545; color: #fff; border-color: #dc3545; }
+.estado-btn.activo-T { background: #ffc107; color: #000; border-color: #ffc107; }
+.estado-btn.activo-N { background: #0dcaf0; color: #000; border-color: #0dcaf0; }
+.fila-estudiante { transition: background .2s; }
+.fila-P { background: rgba(25,135,84,.07); }
+.fila-A { background: rgba(220,53,69,.07); }
+.fila-T { background: rgba(255,193,7,.07); }
+.fila-N { background: rgba(13,202,240,.07); }
+.badge-pago { font-size: 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <!-- Encabezado -->
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <a href="{{ url_for('docente_mi_lista') if es_vista_docente else url_for('asistencia_grupos') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <div>
+        <h3 class="mb-0"><i class="bi bi-clipboard2-check-fill text-success me-2"></i>Pase de Lista</h3>
+        <small class="text-muted">
+          <span class="badge" style="background:linear-gradient(135deg,#667eea,#764ba2);">{{ grupo.categoria.nombre }}</span>
+          &nbsp;{{ grupo.nombre }}
+        </small>
+      </div>
+    </div>
+    <!-- Selector de fecha -->
+    <form method="GET" class="d-flex align-items-center gap-2">
+      <label class="fw-semibold small mb-0">Fecha:</label>
+      <input type="date" name="fecha" class="form-control form-control-sm"
+             value="{{ fecha.strftime('%Y-%m-%d') }}"
+             max="{{ now().strftime('%Y-%m-%d') }}"
+             onchange="this.form.submit()">
+    </form>
+  </div>
+
+  <!-- Fecha actual y leyenda -->
+  <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+    <strong class="me-2">📅 {{ fecha.strftime('%A %d de %B de %Y').capitalize() }}</strong>
+    <span class="badge bg-success">P — Presente</span>
+    <span class="badge bg-danger">A — Ausente</span>
+    <span class="badge bg-warning text-dark">T — Atraso</span>
+    <span class="badge bg-info text-dark">N — Con permiso</span>
+  </div>
+
+  {% if estudiantes %}
+
+  <!-- Barra de acción masiva -->
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-2 d-flex flex-wrap gap-2 align-items-center">
+      <span class="small fw-semibold text-muted me-1">Marcar todos:</span>
+      <button type="button" class="btn btn-sm btn-success" onclick="marcarTodos('P')">
+        <i class="bi bi-check-all"></i> Todos Presentes
+      </button>
+      <button type="button" class="btn btn-sm btn-danger" onclick="marcarTodos('A')">
+        <i class="bi bi-x-lg"></i> Todos Ausentes
+      </button>
+      <div class="ms-auto small text-muted">
+        {{ estudiantes|length }} estudiante(s)
+      </div>
+    </div>
+  </div>
+
+  <form method="POST">
+    <input type="hidden" name="guardar_lista" value="1">
+    <input type="hidden" name="fecha" value="{{ fecha.strftime('%Y-%m-%d') }}">
+
+    <div class="card border-0 shadow-sm">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width:40%">Estudiante</th>
+              <th class="text-center">Estado</th>
+              <th>Observación</th>
+            </tr>
+          </thead>
+          <tbody id="tablaLista">
+            {% for est in estudiantes %}
+            {% set reg = registros.get(est.id) %}
+            {% set estado_actual = reg.estado if reg else 'P' %}
+            <tr class="fila-estudiante fila-{{ estado_actual }}" id="fila-{{ est.id }}">
+              <td>
+                <strong>{{ est.nombre }} {{ est.apellido }}</strong>
+                <br>
+                <small class="text-muted">
+                  {% if est.cedula %}CI: {{ est.cedula }}{% endif %}
+                  {% if est.estado_pago in ['vencido', 'sin-cobertura'] %}
+                  &nbsp;<span class="badge bg-danger badge-pago">⚠ Pago</span>
+                  {% elif est.estado_pago == 'por-vencer' %}
+                  &nbsp;<span class="badge bg-warning text-dark badge-pago">Por vencer</span>
+                  {% endif %}
+                </small>
+                <!-- Campo oculto con el estado -->
+                <input type="hidden" name="estado_{{ est.id }}" id="estado_{{ est.id }}"
+                       value="{{ estado_actual }}">
+              </td>
+              <td class="text-center">
+                <div class="btn-group btn-group-sm" role="group">
+                  {% for codigo, label, cls in [('P','P','success'),('A','A','danger'),('T','T','warning'),('N','N','info')] %}
+                  <button type="button"
+                          class="estado-btn btn btn-outline-{{ cls }} {% if estado_actual == codigo %}activo-{{ codigo }}{% endif %}"
+                          data-id="{{ est.id }}"
+                          data-estado="{{ codigo }}"
+                          onclick="setEstado({{ est.id }}, '{{ codigo }}')">
+                    {{ label }}
+                  </button>
+                  {% endfor %}
+                </div>
+              </td>
+              <td>
+                <input type="text" name="obs_{{ est.id }}" class="form-control form-control-sm"
+                       value="{{ reg.observacion if reg and reg.observacion else '' }}"
+                       placeholder="Observación...">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="mt-3 d-flex gap-2 flex-wrap">
+      <button type="submit" class="btn btn-primary btn-lg">
+        <i class="bi bi-save-fill me-1"></i> Guardar Asistencia
+      </button>
+      <a href="{{ url_for('asistencia_reporte', grupo_id=grupo.id) }}" class="btn btn-outline-info">
+        <i class="bi bi-bar-chart-fill me-1"></i> Ver reporte
+      </a>
+      {% if es_vista_docente %}
+      <a href="{{ url_for('docente_mis_horas', grupo_id=grupo.id) }}" class="btn btn-outline-success">
+        <i class="bi bi-clock-fill me-1"></i> Registrar mis horas de hoy
+      </a>
+      {% endif %}
+    </div>
+  </form>
+
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-person-x" style="font-size:4rem;opacity:.3"></i>
+    <p class="mt-3 fs-5">No hay estudiantes en este grupo.</p>
+    <a href="{{ url_for('asistencia_grupo_estudiantes', id=grupo.id) }}" class="btn btn-primary">
+      <i class="bi bi-person-plus-fill me-1"></i> Agregar estudiantes
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const colores = {
+  'P': 'success', 'A': 'danger', 'T': 'warning', 'N': 'info'
+};
+const claseFila = {
+  'P': 'fila-P', 'A': 'fila-A', 'T': 'fila-T', 'N': 'fila-N'
+};
+
+function setEstado(id, estado) {
+  // Actualizar hidden input
+  document.getElementById('estado_' + id).value = estado;
+
+  // Actualizar estilo de fila
+  const fila = document.getElementById('fila-' + id);
+  fila.className = 'fila-estudiante ' + claseFila[estado];
+
+  // Actualizar botones del grupo
+  const btns = fila.querySelectorAll('.estado-btn');
+  btns.forEach(btn => {
+    const e = btn.dataset.estado;
+    btn.className = 'estado-btn btn btn-outline-' + colores[e];
+    if (e === estado) btn.classList.add('activo-' + estado);
+  });
+}
+
+function marcarTodos(estado) {
+  document.querySelectorAll('[data-estado]').forEach(btn => {
+    if (btn.dataset.estado === estado) {
+      const id = btn.dataset.id;
+      setEstado(id, estado);
+    }
+  });
+}
+</script>
+{% endblock %}

@@ -1,4 +1,3 @@
-
 # -*- coding: utf-8 -*-
 """
 Sistema de Gestión de Mensualidades
@@ -37,7 +36,7 @@ from helpers_pagos import (
 from config import get_config
 
 # Imports necesarios para autenticación y servicios
-from auth import AuthManager, requiere_autenticacion, cambiar_password
+from auth import AuthManager, requiere_autenticacion, requiere_admin, cambiar_password
 from excel_reports import excel_generator
 
 # Inicializar Flask
@@ -99,6 +98,16 @@ def inject_utility_functions():
         'int': int,           # Conversión a entero
         'float': float,       # Conversión a float
         'str': str            # Conversión a string
+    }
+
+# FASE 4: Context processor para roles en templates
+@app.context_processor
+def inject_auth_context():
+    return {
+        'auth_es_admin':   AuthManager.es_admin,
+        'auth_es_docente': AuthManager.es_docente,
+        'auth_get_rol':    AuthManager.get_rol,
+        'auth_docente_id': AuthManager.get_docente_id,
     }
 
 # Importar license manager
@@ -337,7 +346,9 @@ class Cliente(db.Model):
         """True si ya llegó (o pasó) la fecha de inicio de clases"""
         if not self.fecha_inicio_clases:
             return True  # Sin fecha = asumimos que ya inició
-        return datetime.now() >= self.fecha_inicio_clases
+        hoy = datetime.now().date()
+        fecha_inicio_date = self.fecha_inicio_clases.date() if isinstance(self.fecha_inicio_clases, datetime) else self.fecha_inicio_clases
+        return hoy >= fecha_inicio_date
 
     @property
     def dias_para_inicio(self):
@@ -351,20 +362,26 @@ class Cliente(db.Model):
     def dias_restantes(self):
         """
         Días restantes de cobertura
-        
+
         LÓGICA:
         - Si aún no inicia clases: días de cobertura TOTAL
-        - Si ya inició: días hasta fecha_fin
+        - Si ya inició: días hasta fecha_fin (comparación por DATE para que
+          el día exacto de vencimiento cuente como 0, no como -1)
         """
         if not self.fecha_fin:
             return None
 
-        # Si aún no inicia clases, no descuentas días
-        if self.fecha_inicio_clases and datetime.now() < self.fecha_inicio_clases:
-            return max(0, (self.fecha_fin - self.fecha_inicio_clases).days)
+        hoy = datetime.now().date()
+        fecha_fin_date = self.fecha_fin.date() if isinstance(self.fecha_fin, datetime) else self.fecha_fin
 
-        # Si ya inició, sí descuentas desde hoy
-        return (self.fecha_fin - datetime.now()).days
+        # Si aún no inicia clases, no descuentas días
+        if self.fecha_inicio_clases:
+            fecha_inicio_date = self.fecha_inicio_clases.date() if isinstance(self.fecha_inicio_clases, datetime) else self.fecha_inicio_clases
+            if hoy < fecha_inicio_date:
+                return max(0, (fecha_fin_date - fecha_inicio_date).days)
+
+        # Si ya inició, descuentas desde hoy (comparación de fechas puras)
+        return (fecha_fin_date - hoy).days
 
     @property
     def plan_vencido(self):
@@ -372,11 +389,16 @@ class Cliente(db.Model):
         if not self.fecha_fin:
             return False
 
-        # Antes de iniciar clases nunca debe marcarse como vencido
-        if self.fecha_inicio_clases and datetime.now() < self.fecha_inicio_clases:
-            return False
+        hoy = datetime.now().date()
+        fecha_fin_date = self.fecha_fin.date() if isinstance(self.fecha_fin, datetime) else self.fecha_fin
 
-        return datetime.now() > self.fecha_fin
+        # Antes de iniciar clases nunca debe marcarse como vencido
+        if self.fecha_inicio_clases:
+            fecha_inicio_date = self.fecha_inicio_clases.date() if isinstance(self.fecha_inicio_clases, datetime) else self.fecha_inicio_clases
+            if hoy < fecha_inicio_date:
+                return False
+
+        return hoy > fecha_fin_date
 
     @property
     def proximo_a_vencer(self):
@@ -502,6 +524,188 @@ class Plan(db.Model):
     
     def __repr__(self):
         return f'<Plan {self.nombre}>'
+
+
+# ============================================================
+# MÓDULO 1 — ASISTENCIA DE ESTUDIANTES
+# ============================================================
+
+class CategoriaAsistencia(db.Model):
+    """
+    Categorías de grupos (Ej: Preuniversitario, Policía, Militar)
+    El admin las crea libremente.
+    """
+    __tablename__ = 'categoria_asistencia'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False, unique=True)
+    descripcion = db.Column(db.Text)
+    activo = db.Column(db.Boolean, default=True)
+    fecha_creacion = db.Column(db.DateTime, default=datetime.now)
+
+    # Relación 1:N con grupos
+    grupos = db.relationship('GrupoAsistencia', backref='categoria', lazy=True,
+                             cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<CategoriaAsistencia {self.nombre}>'
+
+
+class GrupoAsistencia(db.Model):
+    """
+    Grupos/cursos dentro de una categoría.
+    Un estudiante puede pertenecer a varios grupos (tabla intermedia).
+    """
+    __tablename__ = 'grupo_asistencia'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    descripcion = db.Column(db.Text)
+    categoria_id = db.Column(db.Integer, db.ForeignKey('categoria_asistencia.id'), nullable=False)
+    # FASE 4: docente responsable del grupo (opcional)
+    docente_id = db.Column(db.Integer, db.ForeignKey('docente.id'), nullable=True)
+    activo = db.Column(db.Boolean, default=True)
+    fecha_creacion = db.Column(db.DateTime, default=datetime.now)
+
+    # Relación N:M con estudiantes (Cliente) vía tabla intermedia
+    estudiantes = db.relationship('EstudianteGrupo', backref='grupo', lazy=True,
+                                  cascade='all, delete-orphan')
+    # Relación con registros de asistencia
+    asistencias = db.relationship('AsistenciaDia', backref='grupo', lazy=True,
+                                  cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<GrupoAsistencia {self.nombre}>'
+
+
+class EstudianteGrupo(db.Model):
+    """
+    Tabla intermedia: un estudiante puede pertenecer a varios grupos.
+    Los estudiantes son los mismos del módulo de mensualidades (Cliente).
+    """
+    __tablename__ = 'estudiante_grupo'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
+    grupo_id = db.Column(db.Integer, db.ForeignKey('grupo_asistencia.id'), nullable=False)
+    fecha_inscripcion = db.Column(db.DateTime, default=datetime.now)
+    activo = db.Column(db.Boolean, default=True)
+
+    # Evitar duplicados: un estudiante no puede estar 2 veces en el mismo grupo
+    __table_args__ = (
+        db.UniqueConstraint('cliente_id', 'grupo_id', name='uq_estudiante_grupo'),
+    )
+
+    # Relación directa con Cliente
+    cliente = db.relationship('Cliente', backref='grupos_asistencia', lazy=True)
+
+    def __repr__(self):
+        return f'<EstudianteGrupo cliente={self.cliente_id} grupo={self.grupo_id}>'
+
+
+class AsistenciaDia(db.Model):
+    """
+    Registro diario de asistencia por estudiante y grupo.
+    Estados: P=Presente, A=Ausente, T=Atraso, N=Con permiso
+    """
+    __tablename__ = 'asistencia_dia'
+
+    id = db.Column(db.Integer, primary_key=True)
+    grupo_id = db.Column(db.Integer, db.ForeignKey('grupo_asistencia.id'), nullable=False)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('cliente.id'), nullable=False)
+    fecha = db.Column(db.Date, nullable=False, default=datetime.now().date)
+    # P=Presente, A=Ausente, T=Atraso, N=Con permiso
+    estado = db.Column(db.String(1), nullable=False, default='P')
+    observacion = db.Column(db.String(255))
+    registrado_por = db.Column(db.String(100))  # nombre del docente o admin
+    fecha_registro = db.Column(db.DateTime, default=datetime.now)
+
+    # Evitar duplicados: un registro por estudiante por grupo por día
+    __table_args__ = (
+        db.UniqueConstraint('grupo_id', 'cliente_id', 'fecha', name='uq_asistencia_dia'),
+    )
+
+    # Relación directa con Cliente
+    cliente = db.relationship('Cliente', backref='asistencias', lazy=True)
+
+    def __repr__(self):
+        return f'<AsistenciaDia {self.cliente_id} {self.fecha} {self.estado}>'
+
+    @property
+    def estado_texto(self):
+        estados = {'P': 'Presente', 'A': 'Ausente', 'T': 'Atraso', 'N': 'Con permiso'}
+        return estados.get(self.estado, 'Desconocido')
+
+    @property
+    def estado_color(self):
+        colores = {'P': 'success', 'A': 'danger', 'T': 'warning', 'N': 'info'}
+        return colores.get(self.estado, 'secondary')
+
+
+# ============================================================
+# MÓDULO 2 — CONTROL DE DOCENTES
+# ============================================================
+
+class Docente(db.Model):
+    """
+    Ficha del docente: nombre, materia, proyecto, valor por hora.
+    Tiene su propio login con contraseña propia.
+    """
+    __tablename__ = 'docente'
+
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    apellido = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(150), unique=True, nullable=False)
+    cedula = db.Column(db.String(20))
+    telefono = db.Column(db.String(20))
+    materia = db.Column(db.String(150))
+    proyecto = db.Column(db.String(150))
+    valor_hora = db.Column(db.Float, nullable=False, default=0.0)
+    # Contraseña propia para login docente (SHA-256 de '123456' por defecto)
+    password_hash = db.Column(db.String(64), nullable=False,
+                              default='8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92')
+    activo = db.Column(db.Boolean, default=True)
+    fecha_creacion = db.Column(db.DateTime, default=datetime.now)
+
+    # Relación con horas registradas
+    horas = db.relationship('RegistroHoras', backref='docente', lazy=True,
+                            cascade='all, delete-orphan')
+
+    @property
+    def nombre_completo(self):
+        return f'{self.nombre} {self.apellido}'
+
+    def __repr__(self):
+        return f'<Docente {self.nombre_completo}>'
+
+
+class RegistroHoras(db.Model):
+    """
+    Registro diario de horas dictadas por el docente.
+    Calcula automáticamente el pago: horas × valor_hora.
+    """
+    __tablename__ = 'registro_horas'
+
+    id = db.Column(db.Integer, primary_key=True)
+    docente_id = db.Column(db.Integer, db.ForeignKey('docente.id'), nullable=False)
+    grupo_id = db.Column(db.Integer, db.ForeignKey('grupo_asistencia.id'), nullable=True)  # grupo asociado (opcional)
+    fecha = db.Column(db.Date, nullable=False, default=datetime.now().date)
+    horas_dictadas = db.Column(db.Float, nullable=False, default=0.0)
+    materia = db.Column(db.String(150))   # puede diferir de la materia principal
+    notas = db.Column(db.Text)
+    fecha_registro = db.Column(db.DateTime, default=datetime.now)
+
+    @property
+    def pago_calculado(self):
+        """Pago de este registro: horas × valor_hora del docente"""
+        if self.docente and self.docente.valor_hora:
+            return round(self.horas_dictadas * self.docente.valor_hora, 2)
+        return 0.0
+
+    def __repr__(self):
+        return f'<RegistroHoras docente={self.docente_id} {self.fecha} {self.horas_dictadas}h>'
+
 
 def _recalcular_cobertura_cliente(cliente):
     """
@@ -757,15 +961,19 @@ def _recalcular_cobertura_cliente(cliente):
         "fecha_fin": cliente.fecha_fin
     }
 def requiere_licencia_y_auth(f):
-    """Decorador que requiere licencia válida Y autenticación"""
+    """Decorador que requiere licencia válida Y autenticación de ADMIN (bloquea docentes)"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         # 1. Verificar autenticación
         if not AuthManager.esta_autenticado():
             session['next_url'] = request.url
             return redirect(url_for('login'))
+
+        # 2. Si es docente, redirigir a su portal (no tiene acceso admin)
+        if AuthManager.es_docente():
+            return redirect(url_for('docente_mi_lista'))
         
-        # 2. Verificar licencia
+        # 3. Verificar licencia
         es_demo, mensaje, info = license_manager.verificar_licencia_activa()
         
         if info.get('bloqueado'):
@@ -785,23 +993,42 @@ def requiere_licencia_y_auth(f):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Página de inicio de sesión"""
+    """
+    Login unificado — FASE 4
+    Admin: solo contraseña (campo password)
+    Docente: email + contraseña (campos email + password)
+    """
     if AuthManager.esta_autenticado():
+        if AuthManager.es_docente():
+            return redirect(url_for('docente_mi_lista'))
         return redirect(url_for('index'))
-    
+
     if request.method == 'POST':
-        password = request.form.get('password', '').strip()
-        password_hash = Configuracion.obtener('PASSWORD_HASH', AuthManager.DEFAULT_PASSWORD_HASH)
-        
-        if AuthManager.verificar_password(password, password_hash):
-            AuthManager.iniciar_sesion(password)
-            app.logger.info('Inicio de sesión exitoso')
+        email_field   = request.form.get('email', '').strip()
+        password_raw  = request.form.get('password', '').strip()
+
+        # ── Intento 1: login Admin ──────────────────────────
+        password_hash_bd = Configuracion.obtener('PASSWORD_HASH', AuthManager.DEFAULT_PASSWORD_HASH)
+        if AuthManager.verificar_password(password_raw, password_hash_bd):
+            AuthManager.iniciar_sesion(password_raw, rol='admin')
+            app.logger.info('Admin: inicio de sesión exitoso')
             next_url = session.pop('next_url', None)
             return redirect(next_url or url_for('index'))
-        else:
-            app.logger.warning('Intento de inicio de sesión fallido')
-            flash('❌ Contraseña incorrecta', 'danger')
-    
+
+        # ── Intento 2: login Docente (requiere email) ───────
+        if email_field:
+            import hashlib as _hl
+            docente = Docente.query.filter_by(email=email_field, activo=True).first()
+            if docente:
+                pwd_hash = _hl.sha256(password_raw.encode()).hexdigest()
+                if pwd_hash == docente.password_hash:
+                    AuthManager.iniciar_sesion(password_raw, rol='docente', docente_id=docente.id)
+                    app.logger.info(f'Docente {docente.nombre_completo}: inicio de sesión')
+                    return redirect(url_for('docente_mi_lista'))
+
+        app.logger.warning('Intento de inicio de sesión fallido')
+        flash('❌ Credenciales incorrectas. Verifica tu email y contraseña.', 'danger')
+
     return render_template('login.html')
 
 
@@ -3560,6 +3787,21 @@ with app.app_context():
         # 1. Crear tablas primero
         db.create_all()
         app.logger.info("✅ Tablas de base de datos creadas/verificadas")
+
+        # 1b. Migración automática: agregar columnas que falten
+        try:
+            from sqlalchemy import text, inspect as sa_inspect
+            inspector = sa_inspect(db.engine)
+            cols_rh = [c["name"] for c in inspector.get_columns("registro_horas")]
+            if "grupo_id" not in cols_rh:
+                with db.engine.connect() as conn:
+                    conn.execute(text(
+                        "ALTER TABLE registro_horas ADD COLUMN grupo_id INTEGER REFERENCES grupo_asistencia(id)"
+                    ))
+                    conn.commit()
+                app.logger.info("✅ Migración: columna grupo_id agregada a registro_horas")
+        except Exception as emig:
+            app.logger.warning(f"⚠️ Migración grupo_id: {emig}")
         
         # 2. Inicializar contraseña por defecto si no existe
         if not Configuracion.obtener('PASSWORD_HASH'):
@@ -3836,6 +4078,791 @@ def test_restaurar(cliente_id):
         app.logger.error(f'Error restaurando estado: {e}')
         return jsonify({'success': False, 'error': str(e)}), 500
 #================================================================================================================================================================================
+# MÓDULO 1 — RUTAS DE ASISTENCIA
+#================================================================================================================================================================================
+
+# ── Categorías ──────────────────────────────────────────────
+@app.route('/asistencia/categorias')
+@requiere_licencia_y_auth
+def asistencia_categorias():
+    categorias = CategoriaAsistencia.query.order_by(CategoriaAsistencia.nombre).all()
+    return render_template('asistencia/categorias.html', categorias=categorias)
+
+
+@app.route('/asistencia/categorias/nueva', methods=['GET', 'POST'])
+@requiere_licencia_y_auth
+def asistencia_categoria_nueva():
+    if request.method == 'POST':
+        nombre = request.form.get('nombre', '').strip()
+        descripcion = request.form.get('descripcion', '').strip()
+        if not nombre:
+            flash('El nombre de la categoría es obligatorio.', 'danger')
+            return redirect(url_for('asistencia_categoria_nueva'))
+        if CategoriaAsistencia.query.filter_by(nombre=nombre).first():
+            flash('Ya existe una categoría con ese nombre.', 'warning')
+            return redirect(url_for('asistencia_categoria_nueva'))
+        cat = CategoriaAsistencia(nombre=nombre, descripcion=descripcion)
+        db.session.add(cat)
+        db.session.commit()
+        flash(f'Categoría "{nombre}" creada correctamente.', 'success')
+        return redirect(url_for('asistencia_categorias'))
+    return render_template('asistencia/categoria_form.html', categoria=None)
+
+
+@app.route('/asistencia/categorias/<int:id>/editar', methods=['GET', 'POST'])
+@requiere_licencia_y_auth
+def asistencia_categoria_editar(id):
+    cat = CategoriaAsistencia.query.get_or_404(id)
+    if request.method == 'POST':
+        nombre = request.form.get('nombre', '').strip()
+        if not nombre:
+            flash('El nombre es obligatorio.', 'danger')
+            return redirect(url_for('asistencia_categoria_editar', id=id))
+        cat.nombre = nombre
+        cat.descripcion = request.form.get('descripcion', '').strip()
+        db.session.commit()
+        flash('Categoría actualizada.', 'success')
+        return redirect(url_for('asistencia_categorias'))
+    return render_template('asistencia/categoria_form.html', categoria=cat)
+
+
+@app.route('/asistencia/categorias/<int:id>/eliminar', methods=['POST'])
+@requiere_licencia_y_auth
+def asistencia_categoria_eliminar(id):
+    cat = CategoriaAsistencia.query.get_or_404(id)
+    nombre = cat.nombre
+    db.session.delete(cat)
+    db.session.commit()
+    flash(f'Categoría "{nombre}" eliminada.', 'success')
+    return redirect(url_for('asistencia_categorias'))
+
+
+# ── Grupos ───────────────────────────────────────────────────
+@app.route('/asistencia/grupos')
+@requiere_licencia_y_auth
+def asistencia_grupos():
+    grupos = GrupoAsistencia.query.order_by(GrupoAsistencia.nombre).all()
+    categorias = CategoriaAsistencia.query.filter_by(activo=True).order_by(CategoriaAsistencia.nombre).all()
+    return render_template('asistencia/grupos.html', grupos=grupos, categorias=categorias)
+
+
+@app.route('/asistencia/grupos/nuevo', methods=['GET', 'POST'])
+@requiere_licencia_y_auth
+def asistencia_grupo_nuevo():
+    categorias = CategoriaAsistencia.query.filter_by(activo=True).order_by(CategoriaAsistencia.nombre).all()
+    if request.method == 'POST':
+        nombre = request.form.get('nombre', '').strip()
+        categoria_id = request.form.get('categoria_id')
+        descripcion = request.form.get('descripcion', '').strip()
+        if not nombre or not categoria_id:
+            flash('Nombre y categoría son obligatorios.', 'danger')
+            return render_template('asistencia/grupo_form.html', grupo=None, categorias=categorias)
+        grupo = GrupoAsistencia(nombre=nombre, categoria_id=int(categoria_id), descripcion=descripcion)
+        db.session.add(grupo)
+        db.session.commit()
+        flash(f'Grupo "{nombre}" creado.', 'success')
+        return redirect(url_for('asistencia_grupos'))
+    return render_template('asistencia/grupo_form.html', grupo=None, categorias=categorias)
+
+
+@app.route('/asistencia/grupos/<int:id>/editar', methods=['GET', 'POST'])
+@requiere_licencia_y_auth
+def asistencia_grupo_editar(id):
+    grupo = GrupoAsistencia.query.get_or_404(id)
+    categorias = CategoriaAsistencia.query.filter_by(activo=True).order_by(CategoriaAsistencia.nombre).all()
+    if request.method == 'POST':
+        grupo.nombre = request.form.get('nombre', '').strip()
+        grupo.categoria_id = int(request.form.get('categoria_id'))
+        grupo.descripcion = request.form.get('descripcion', '').strip()
+        db.session.commit()
+        flash('Grupo actualizado.', 'success')
+        return redirect(url_for('asistencia_grupos'))
+    return render_template('asistencia/grupo_form.html', grupo=grupo, categorias=categorias)
+
+
+@app.route('/asistencia/grupos/<int:id>/eliminar', methods=['POST'])
+@requiere_licencia_y_auth
+def asistencia_grupo_eliminar(id):
+    grupo = GrupoAsistencia.query.get_or_404(id)
+    nombre = grupo.nombre
+    db.session.delete(grupo)
+    db.session.commit()
+    flash(f'Grupo "{nombre}" eliminado.', 'success')
+    return redirect(url_for('asistencia_grupos'))
+
+
+# ── Estudiantes en grupo ──────────────────────────────────────
+@app.route('/asistencia/grupos/<int:id>/estudiantes', methods=['GET', 'POST'])
+@requiere_licencia_y_auth
+def asistencia_grupo_estudiantes(id):
+    grupo = GrupoAsistencia.query.get_or_404(id)
+    if request.method == 'POST':
+        cliente_id = request.form.get('cliente_id')
+        if cliente_id:
+            ya_existe = EstudianteGrupo.query.filter_by(
+                grupo_id=id, cliente_id=int(cliente_id)
+            ).first()
+            if ya_existe:
+                flash('El estudiante ya está en este grupo.', 'warning')
+            else:
+                eg = EstudianteGrupo(grupo_id=id, cliente_id=int(cliente_id))
+                db.session.add(eg)
+                db.session.commit()
+                flash('Estudiante agregado al grupo.', 'success')
+        return redirect(url_for('asistencia_grupo_estudiantes', id=id))
+
+    # Estudiantes ya inscritos en el grupo
+    inscritos_ids = [eg.cliente_id for eg in grupo.estudiantes if eg.activo]
+    # Todos los estudiantes activos para el selector
+    todos = Cliente.query.filter_by(activo=True).order_by(Cliente.nombre).all()
+    disponibles = [c for c in todos if c.id not in inscritos_ids]
+    inscritos = Cliente.query.filter(Cliente.id.in_(inscritos_ids)).all()
+    return render_template('asistencia/grupo_estudiantes.html',
+                           grupo=grupo, inscritos=inscritos, disponibles=disponibles)
+
+
+@app.route('/asistencia/grupos/<int:grupo_id>/estudiantes/<int:cliente_id>/quitar', methods=['POST'])
+@requiere_licencia_y_auth
+def asistencia_grupo_quitar_estudiante(grupo_id, cliente_id):
+    eg = EstudianteGrupo.query.filter_by(grupo_id=grupo_id, cliente_id=cliente_id).first_or_404()
+    db.session.delete(eg)
+    db.session.commit()
+    flash('Estudiante quitado del grupo.', 'success')
+    return redirect(url_for('asistencia_grupo_estudiantes', id=grupo_id))
+
+
+# ── Pase de lista ─────────────────────────────────────────────
+@app.route('/asistencia/grupos/<int:grupo_id>/lista', methods=['GET', 'POST'])
+@requiere_licencia_y_auth
+def asistencia_pase_lista(grupo_id):
+    grupo = GrupoAsistencia.query.get_or_404(grupo_id)
+    fecha_str = request.args.get('fecha') or request.form.get('fecha')
+    try:
+        fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date() if fecha_str else datetime.now().date()
+    except ValueError:
+        fecha = datetime.now().date()
+
+    inscritos_ids = [eg.cliente_id for eg in grupo.estudiantes if eg.activo]
+    estudiantes = Cliente.query.filter(Cliente.id.in_(inscritos_ids)).order_by(Cliente.nombre).all()
+
+    if request.method == 'POST' and 'guardar_lista' in request.form:
+        for est in estudiantes:
+            estado = request.form.get(f'estado_{est.id}', 'A')
+            observacion = request.form.get(f'obs_{est.id}', '').strip()
+            # Buscar registro existente para ese día
+            reg = AsistenciaDia.query.filter_by(
+                grupo_id=grupo_id, cliente_id=est.id, fecha=fecha
+            ).first()
+            if reg:
+                reg.estado = estado
+                reg.observacion = observacion
+            else:
+                reg = AsistenciaDia(
+                    grupo_id=grupo_id,
+                    cliente_id=est.id,
+                    fecha=fecha,
+                    estado=estado,
+                    observacion=observacion
+                )
+                db.session.add(reg)
+        db.session.commit()
+        flash(f'✅ Asistencia del {fecha.strftime("%d/%m/%Y")} guardada correctamente.', 'success')
+        return redirect(url_for('asistencia_pase_lista', grupo_id=grupo_id, fecha=fecha.strftime('%Y-%m-%d')))
+
+    # Cargar registros existentes para esa fecha
+    registros = {
+        r.cliente_id: r
+        for r in AsistenciaDia.query.filter_by(grupo_id=grupo_id, fecha=fecha).all()
+    }
+
+    return render_template('asistencia/pase_lista.html',
+                           grupo=grupo,
+                           estudiantes=estudiantes,
+                           fecha=fecha,
+                           registros=registros)
+
+
+@app.route('/asistencia/grupos/<int:grupo_id>/reporte')
+@requiere_autenticacion
+def asistencia_reporte(grupo_id):
+    """Reporte de asistencia del mes exportable a Excel."""
+    from calendar import monthrange
+    grupo = GrupoAsistencia.query.get_or_404(grupo_id)
+
+    # Docente solo puede ver reporte de sus grupos
+    if AuthManager.es_docente():
+        docente_id = AuthManager.get_docente_id()
+        if grupo.docente_id != docente_id:
+            flash('⛔ No tienes acceso al reporte de ese grupo.', 'danger')
+            return redirect(url_for('docente_mi_lista'))
+
+    mes = int(request.args.get('mes', datetime.now().month))
+    anio = int(request.args.get('anio', datetime.now().year))
+
+    inscritos_ids = [eg.cliente_id for eg in grupo.estudiantes if eg.activo]
+    estudiantes = Cliente.query.filter(Cliente.id.in_(inscritos_ids)).order_by(Cliente.nombre).all()
+
+    primer_dia = datetime(anio, mes, 1).date()
+    ultimo_dia = datetime(anio, mes, monthrange(anio, mes)[1]).date()
+
+    asistencias = AsistenciaDia.query.filter(
+        AsistenciaDia.grupo_id == grupo_id,
+        AsistenciaDia.fecha >= primer_dia,
+        AsistenciaDia.fecha <= ultimo_dia
+    ).all()
+
+    # Organizar por cliente_id → fecha → estado
+    mapa = {}
+    for a in asistencias:
+        mapa.setdefault(a.cliente_id, {})[a.fecha] = a
+
+    exportar = request.args.get('exportar') == 'excel'
+    if exportar:
+        return _exportar_asistencia_excel(grupo, estudiantes, mapa, mes, anio, primer_dia, ultimo_dia)
+
+    return render_template('asistencia/reporte.html',
+                           grupo=grupo,
+                           estudiantes=estudiantes,
+                           mapa=mapa,
+                           mes=mes, anio=anio,
+                           primer_dia=primer_dia,
+                           ultimo_dia=ultimo_dia,
+                           timedelta=timedelta)
+
+
+def _exportar_asistencia_excel(grupo, estudiantes, mapa, mes, anio, primer_dia, ultimo_dia):
+    """Genera y descarga el reporte de asistencia en Excel (versión profesional)."""
+    from excel_reports_pro import generar_reporte_asistencia, nombre_archivo_asistencia
+    buf = generar_reporte_asistencia(grupo, estudiantes, mapa, mes, anio)
+    return send_file(buf, as_attachment=True,
+                     download_name=nombre_archivo_asistencia(grupo.nombre, mes, anio),
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+# ── API AJAX: actualizar un estado individual ─────────────────
+@app.route('/asistencia/actualizar', methods=['POST'])
+@requiere_licencia_y_auth
+def asistencia_actualizar():
+    """Actualiza un registro de asistencia individual vía AJAX."""
+    data = request.get_json()
+    grupo_id = data.get('grupo_id')
+    cliente_id = data.get('cliente_id')
+    fecha_str = data.get('fecha')
+    estado = data.get('estado', 'P')
+    try:
+        fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        reg = AsistenciaDia.query.filter_by(
+            grupo_id=grupo_id, cliente_id=cliente_id, fecha=fecha
+        ).first()
+        if reg:
+            reg.estado = estado
+        else:
+            reg = AsistenciaDia(grupo_id=grupo_id, cliente_id=cliente_id,
+                                fecha=fecha, estado=estado)
+            db.session.add(reg)
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+#================================================================================================================================================================================
+# MÓDULO 2 — RUTAS DE DOCENTES
+#================================================================================================================================================================================
+
+import hashlib as _hashlib
+
+@app.route('/docentes')
+@requiere_licencia_y_auth
+def docentes_lista():
+    docentes = Docente.query.order_by(Docente.apellido).all()
+    return render_template('docentes/lista.html', docentes=docentes)
+
+
+@app.route('/docentes/nuevo', methods=['GET', 'POST'])
+@requiere_licencia_y_auth
+def docente_nuevo():
+    if request.method == 'POST':
+        nombre = request.form.get('nombre', '').strip()
+        apellido = request.form.get('apellido', '').strip()
+        email = request.form.get('email', '').strip()
+        materia = request.form.get('materia', '').strip()
+        proyecto = request.form.get('proyecto', '').strip()
+        valor_hora = float(request.form.get('valor_hora', 0))
+        cedula = request.form.get('cedula', '').strip()
+        telefono = request.form.get('telefono', '').strip()
+        password_raw = request.form.get('password', '123456').strip() or '123456'
+
+        if not nombre or not apellido or not email:
+            flash('Nombre, apellido y email son obligatorios.', 'danger')
+            grupos_disponibles = GrupoAsistencia.query.filter_by(activo=True).order_by(GrupoAsistencia.nombre).all()
+            return render_template('docentes/formulario.html', docente=None,
+                                   grupos_disponibles=grupos_disponibles, grupos_asignados_ids=[])
+
+        if Docente.query.filter_by(email=email).first():
+            flash('Ya existe un docente con ese email.', 'warning')
+            grupos_disponibles = GrupoAsistencia.query.filter_by(activo=True).order_by(GrupoAsistencia.nombre).all()
+            return render_template('docentes/formulario.html', docente=None,
+                                   grupos_disponibles=grupos_disponibles, grupos_asignados_ids=[])
+
+        pwd_hash = _hashlib.sha256(password_raw.encode()).hexdigest()
+        doc = Docente(nombre=nombre, apellido=apellido, email=email,
+                      materia=materia, proyecto=proyecto, valor_hora=valor_hora,
+                      cedula=cedula, telefono=telefono, password_hash=pwd_hash)
+        db.session.add(doc)
+        db.session.flush()  # obtener doc.id antes del commit
+
+        # Asignar grupos seleccionados
+        grupos_ids = request.form.getlist('grupos_ids')
+        for gid in grupos_ids:
+            grupo = GrupoAsistencia.query.get(int(gid))
+            if grupo:
+                grupo.docente_id = doc.id
+
+        db.session.commit()
+        flash(f'Docente {nombre} {apellido} creado. Contraseña: {password_raw}', 'success')
+        return redirect(url_for('docentes_lista'))
+
+    grupos_disponibles = GrupoAsistencia.query.filter_by(activo=True).order_by(GrupoAsistencia.nombre).all()
+    return render_template('docentes/formulario.html', docente=None,
+                           grupos_disponibles=grupos_disponibles, grupos_asignados_ids=[])
+
+
+@app.route('/docentes/<int:id>/editar', methods=['GET', 'POST'])
+@requiere_licencia_y_auth
+def docente_editar(id):
+    doc = Docente.query.get_or_404(id)
+    if request.method == 'POST':
+        doc.nombre = request.form.get('nombre', '').strip()
+        doc.apellido = request.form.get('apellido', '').strip()
+        doc.email = request.form.get('email', '').strip()
+        doc.materia = request.form.get('materia', '').strip()
+        doc.proyecto = request.form.get('proyecto', '').strip()
+        doc.valor_hora = float(request.form.get('valor_hora', 0))
+        doc.cedula = request.form.get('cedula', '').strip()
+        doc.telefono = request.form.get('telefono', '').strip()
+        nueva_pass = request.form.get('password', '').strip()
+        if nueva_pass:
+            doc.password_hash = _hashlib.sha256(nueva_pass.encode()).hexdigest()
+
+        # Actualizar grupos asignados:
+        # 1. Quitar docente_id de todos los grupos que tenían este docente
+        GrupoAsistencia.query.filter_by(docente_id=doc.id).update({'docente_id': None})
+        # 2. Asignar los grupos seleccionados en el formulario
+        grupos_ids = request.form.getlist('grupos_ids')
+        for gid in grupos_ids:
+            grupo = GrupoAsistencia.query.get(int(gid))
+            if grupo:
+                grupo.docente_id = doc.id
+
+        db.session.commit()
+        flash('Docente actualizado.', 'success')
+        return redirect(url_for('docentes_lista'))
+
+    grupos_disponibles = GrupoAsistencia.query.filter_by(activo=True).order_by(GrupoAsistencia.nombre).all()
+    grupos_asignados_ids = [g.id for g in GrupoAsistencia.query.filter_by(docente_id=doc.id).all()]
+    return render_template('docentes/formulario.html', docente=doc,
+                           grupos_disponibles=grupos_disponibles,
+                           grupos_asignados_ids=grupos_asignados_ids)
+
+
+@app.route('/docentes/<int:id>/eliminar', methods=['POST'])
+@requiere_licencia_y_auth
+def docente_eliminar(id):
+    doc = Docente.query.get_or_404(id)
+    nombre = doc.nombre_completo
+    db.session.delete(doc)
+    db.session.commit()
+    flash(f'Docente {nombre} eliminado.', 'success')
+    return redirect(url_for('docentes_lista'))
+
+
+# ── Registro de horas ─────────────────────────────────────────
+@app.route('/docentes/<int:docente_id>/horas', methods=['GET', 'POST'])
+@requiere_licencia_y_auth
+def docente_horas(docente_id):
+    doc = Docente.query.get_or_404(docente_id)
+    if request.method == 'POST':
+        fecha_str = request.form.get('fecha')
+        horas = float(request.form.get('horas_dictadas', 0))
+        materia = request.form.get('materia', '').strip() or doc.materia
+        notas = request.form.get('notas', '').strip()
+        try:
+            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        except Exception:
+            fecha = datetime.now().date()
+        reg = RegistroHoras(docente_id=docente_id, fecha=fecha,
+                            horas_dictadas=horas, materia=materia, notas=notas)
+        db.session.add(reg)
+        db.session.commit()
+        flash(f'✅ Registro de {horas}h añadido para {doc.nombre_completo}.', 'success')
+        return redirect(url_for('docente_horas', docente_id=docente_id))
+
+    mes = int(request.args.get('mes', datetime.now().month))
+    anio = int(request.args.get('anio', datetime.now().year))
+    from calendar import monthrange
+    primer_dia = datetime(anio, mes, 1).date()
+    ultimo_dia = datetime(anio, mes, monthrange(anio, mes)[1]).date()
+
+    registros = RegistroHoras.query.filter(
+        RegistroHoras.docente_id == docente_id,
+        RegistroHoras.fecha >= primer_dia,
+        RegistroHoras.fecha <= ultimo_dia
+    ).order_by(RegistroHoras.fecha.desc()).all()
+
+    total_horas = sum(r.horas_dictadas for r in registros)
+    total_pago = sum(r.pago_calculado for r in registros)
+
+    exportar = request.args.get('exportar') == 'excel'
+    if exportar:
+        return _exportar_horas_excel(doc, registros, total_horas, total_pago, mes, anio)
+
+    return render_template('docentes/horas.html',
+                           docente=doc, registros=registros,
+                           total_horas=total_horas, total_pago=total_pago,
+                           mes=mes, anio=anio)
+
+
+@app.route('/docentes/horas/<int:reg_id>/eliminar', methods=['POST'])
+@requiere_licencia_y_auth
+def docente_hora_eliminar(reg_id):
+    reg = RegistroHoras.query.get_or_404(reg_id)
+    docente_id = reg.docente_id
+    db.session.delete(reg)
+    db.session.commit()
+    flash('Registro de horas eliminado.', 'success')
+    return redirect(url_for('docente_horas', docente_id=docente_id))
+
+
+# ── Registro de horas propio del docente ──────────────────────
+@app.route('/docente/mis-horas', methods=['GET', 'POST'])
+@requiere_autenticacion
+def docente_mis_horas():
+    """El docente registra y consulta sus propias horas desde su sesión."""
+    if AuthManager.es_admin():
+        return redirect(url_for('index'))
+
+    docente_id = AuthManager.get_docente_id()
+    if not docente_id:
+        AuthManager.cerrar_sesion()
+        return redirect(url_for('login'))
+
+    doc = Docente.query.get_or_404(docente_id)
+    # Grupo pre-seleccionado (opcional, viene del pase de lista)
+    grupo_id_pre = request.args.get('grupo_id', type=int)
+    grupo_pre = GrupoAsistencia.query.get(grupo_id_pre) if grupo_id_pre else None
+
+    # Todos los grupos activos para el selector (el docente puede registrar horas en cualquier grupo)
+    mis_grupos = GrupoAsistencia.query.filter_by(activo=True).order_by(GrupoAsistencia.nombre).all()
+
+    if request.method == 'POST':
+        fecha_str = request.form.get('fecha')
+        horas = float(request.form.get('horas_dictadas', 0) or 0)
+        materia = request.form.get('materia', '').strip() or doc.materia
+        notas = request.form.get('notas', '').strip()
+        grupo_id_form = request.form.get('grupo_id_form', type=int)
+        try:
+            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        except Exception:
+            fecha = datetime.now().date()
+
+        # Validar duplicado: mismo docente, mismo día, mismo grupo
+        filtro = {'docente_id': docente_id, 'fecha': fecha}
+        if grupo_id_form:
+            filtro['grupo_id'] = grupo_id_form
+        existente = RegistroHoras.query.filter_by(**filtro).first()
+        if existente:
+            flash(f'⚠️ Ya existe un registro para el {fecha.strftime("%d/%m/%Y")} en ese grupo. Elimínalo primero si deseas corregirlo.', 'warning')
+        elif horas <= 0:
+            flash('Las horas deben ser mayor a 0.', 'danger')
+        else:
+            reg = RegistroHoras(docente_id=docente_id, fecha=fecha,
+                                horas_dictadas=horas, materia=materia, notas=notas)
+            if grupo_id_form:
+                reg.grupo_id = grupo_id_form
+            db.session.add(reg)
+            db.session.commit()
+            flash(f'✅ {horas}h registradas para el {fecha.strftime("%d/%m/%Y")}.', 'success')
+
+        return redirect(url_for('docente_mis_horas',
+                                mes=request.form.get('mes_actual', datetime.now().month),
+                                anio=request.form.get('anio_actual', datetime.now().year),
+                                grupo_id=grupo_id_form or grupo_id_pre or ''))
+
+    mes = int(request.args.get('mes', datetime.now().month))
+    anio = int(request.args.get('anio', datetime.now().year))
+    from calendar import monthrange
+    primer_dia = datetime(anio, mes, 1).date()
+    ultimo_dia = datetime(anio, mes, monthrange(anio, mes)[1]).date()
+
+    registros = RegistroHoras.query.filter(
+        RegistroHoras.docente_id == docente_id,
+        RegistroHoras.fecha >= primer_dia,
+        RegistroHoras.fecha <= ultimo_dia
+    ).order_by(RegistroHoras.fecha.desc()).all()
+
+    total_horas = sum(r.horas_dictadas for r in registros)
+    total_pago = sum(r.pago_calculado for r in registros)
+
+    return render_template('docentes/mis_horas.html',
+                           docente=doc, registros=registros,
+                           total_horas=total_horas, total_pago=total_pago,
+                           mes=mes, anio=anio,
+                           mis_grupos=mis_grupos,
+                           grupo_pre=grupo_pre)
+
+
+def _exportar_horas_excel(doc, registros, total_horas, total_pago, mes, anio):
+    """Genera Excel del reporte mensual de horas y pagos de un docente (versión profesional)."""
+    from excel_reports_pro import generar_reporte_horas_docente, nombre_archivo_horas
+    buf = generar_reporte_horas_docente(doc, registros, mes, anio)
+    return send_file(buf, as_attachment=True,
+                     download_name=nombre_archivo_horas(doc.apellido, mes, anio),
+                     mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+# ============================================================
+# MÓDULO 3 — PORTAL PÚBLICO PARA PADRES DE FAMILIA
+# ============================================================
+
+@app.route('/portal', methods=['GET', 'POST'])
+def portal_padres():
+    """
+    Portal público: el padre ingresa la cédula del estudiante
+    y ve resumen de asistencia del mes + estado de mensualidades.
+    Sin login, acceso solo con cédula.
+    """
+    resultado = None
+    cedula_buscada = ''
+    error = None
+
+    if request.method == 'POST':
+        cedula_buscada = request.form.get('cedula', '').strip()
+
+        if not cedula_buscada:
+            error = 'Por favor ingresa la cédula del estudiante.'
+        else:
+            estudiante = Cliente.query.filter_by(cedula=cedula_buscada, activo=True).first()
+
+            if not estudiante:
+                error = 'No se encontró ningún estudiante activo con esa cédula.'
+            else:
+                from calendar import monthrange
+                hoy = datetime.now().date()
+                mes = hoy.month
+                anio = hoy.year
+                primer_dia = datetime(anio, mes, 1).date()
+                ultimo_dia = datetime(anio, mes, monthrange(anio, mes)[1]).date()
+
+                grupos_del_estudiante = EstudianteGrupo.query.filter_by(
+                    cliente_id=estudiante.id, activo=True
+                ).all()
+
+                resumen_grupos = []
+                for eg in grupos_del_estudiante:
+                    grupo = eg.grupo
+                    asistencias = AsistenciaDia.query.filter(
+                        AsistenciaDia.grupo_id == grupo.id,
+                        AsistenciaDia.cliente_id == estudiante.id,
+                        AsistenciaDia.fecha >= primer_dia,
+                        AsistenciaDia.fecha <= ultimo_dia
+                    ).order_by(AsistenciaDia.fecha).all()
+
+                    conteo = {'P': 0, 'A': 0, 'T': 0, 'N': 0}
+                    for a in asistencias:
+                        if a.estado in conteo:
+                            conteo[a.estado] += 1
+
+                    total_clases = sum(conteo.values())
+                    pct_asistencia = round(conteo['P'] / total_clases * 100, 1) if total_clases else 0
+
+                    resumen_grupos.append({
+                        'grupo': grupo,
+                        'categoria': grupo.categoria.nombre,
+                        'asistencias': asistencias,
+                        'conteo': conteo,
+                        'total_clases': total_clases,
+                        'pct_asistencia': pct_asistencia,
+                    })
+
+                pagos_realizados = Pago.query.filter_by(
+                    cliente_id=estudiante.id
+                ).order_by(Pago.fecha_pago.desc()).limit(6).all()
+
+                total_programa   = estudiante.total_programa
+                total_pagado     = estudiante.total_pagado
+                saldo_pendiente  = estudiante.saldo_pendiente
+                estado_pago      = estudiante.estado_pago
+
+                resultado = {
+                    'estudiante':      estudiante,
+                    'mes':             mes,
+                    'anio':            anio,
+                    'primer_dia':      primer_dia,
+                    'ultimo_dia':      ultimo_dia,
+                    'resumen_grupos':  resumen_grupos,
+                    'pagos_recientes': pagos_realizados,
+                    'total_programa':  total_programa,
+                    'total_pagado':    total_pagado,
+                    'saldo_pendiente': saldo_pendiente,
+                    'estado_pago':     estado_pago,
+                }
+
+    return render_template(
+        'portal/padres.html',
+        resultado=resultado,
+        cedula_buscada=cedula_buscada,
+        error=error
+    )
+
+
+
+
+# ============================================================
+# PORTAL PADRES — DESCARGA DE PDF (sin autenticación)
+# ============================================================
+
+@app.route('/portal/pdf/<cedula>')
+def portal_padres_pdf(cedula):
+    """
+    Genera y descarga el PDF de resumen del estudiante para el portal de padres.
+    Acceso público: solo con la cédula del estudiante.
+    """
+    try:
+        from pdf_reports import pdf_generator
+
+        # 1. Buscar estudiante por cédula
+        estudiante = Cliente.query.filter_by(cedula=cedula, activo=True).first()
+        if not estudiante:
+            flash('❌ No se encontró ningún estudiante con esa cédula.', 'danger')
+            return redirect(url_for('portal_padres'))
+
+        # 2. Configurar empresa
+        nombre_empresa = Configuracion.obtener('NOMBRE_EMPRESA', 'Sistema de Gestión')
+        eslogan_empresa = Configuracion.obtener('ESLOGAN_EMPRESA', 'Control de Mensualidades')
+        pdf_generator.nombre_empresa = nombre_empresa
+        pdf_generator.eslogan_empresa = eslogan_empresa
+
+        # 3. Generar PDF (reutiliza el generador del estudiante)
+        pdf_file = pdf_generator.generar_reporte_estudiante(estudiante)
+
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'resumen_{estudiante.nombre}_{estudiante.apellido}_{timestamp}.pdf'
+
+        app.logger.info(f'📄 PDF portal padres generado: {estudiante.nombre_completo}')
+
+        return send_file(
+            pdf_file,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        app.logger.error(f'❌ Error generando PDF portal padres: {e}')
+        import traceback
+        app.logger.error(traceback.format_exc())
+        flash(f'❌ Error al generar el PDF: {str(e)}', 'danger')
+        return redirect(url_for('portal_padres'))
+
+# ============================================================
+# MÓDULO 4 — VISTA DEL DOCENTE: mis grupos y pase de lista
+# ============================================================
+
+import hashlib as _hashlib_doc
+
+@app.route('/docente/mis-grupos')
+@requiere_autenticacion
+def docente_mi_lista():
+    """Vista de inicio para el docente: lista TODOS los grupos activos para que elija dónde tomar lista."""
+    if AuthManager.es_admin():
+        return redirect(url_for('index'))
+
+    docente_id = AuthManager.get_docente_id()
+    if not docente_id:
+        AuthManager.cerrar_sesion()
+        return redirect(url_for('login'))
+
+    docente = Docente.query.get_or_404(docente_id)
+
+    # Mostrar TODOS los grupos activos (no solo los asignados al docente)
+    todos_grupos = GrupoAsistencia.query.filter_by(activo=True).order_by(GrupoAsistencia.nombre).all()
+
+    # Agrupar por categoría para mejor navegación
+    from collections import defaultdict
+    grupos_por_categoria = defaultdict(list)
+    for g in todos_grupos:
+        cat_nombre = g.categoria.nombre if g.categoria else "Sin categoría"
+        grupos_por_categoria[cat_nombre].append(g)
+    categorias_con_grupos = sorted(grupos_por_categoria.items(), key=lambda x: x[0])
+
+    return render_template(
+        'docentes/mis_grupos.html',
+        docente=docente,
+        mis_grupos=todos_grupos,
+        categorias_con_grupos=categorias_con_grupos
+    )
+
+
+@app.route('/docente/grupos/<int:grupo_id>/lista', methods=['GET', 'POST'])
+@requiere_autenticacion
+def docente_pase_lista(grupo_id):
+    """Pase de lista para el docente — puede tomar lista en cualquier grupo activo."""
+    docente_id = AuthManager.get_docente_id()
+    grupo = GrupoAsistencia.query.get_or_404(grupo_id)
+
+    # El docente puede tomar lista en cualquier grupo activo (no limitado a los asignados)
+    if not grupo.activo:
+        flash('⛔ Ese grupo no está activo.', 'danger')
+        return redirect(url_for('docente_mi_lista'))
+
+    fecha_str = request.args.get('fecha') or request.form.get('fecha')
+    try:
+        fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date() if fecha_str else datetime.now().date()
+    except ValueError:
+        fecha = datetime.now().date()
+
+    inscritos_ids = [eg.cliente_id for eg in grupo.estudiantes if eg.activo]
+    estudiantes = Cliente.query.filter(Cliente.id.in_(inscritos_ids)).order_by(Cliente.nombre).all()
+
+    if request.method == 'POST' and 'guardar_lista' in request.form:
+        for est in estudiantes:
+            estado = request.form.get(f'estado_{est.id}', 'A')
+            observacion = request.form.get(f'obs_{est.id}', '').strip()
+            reg = AsistenciaDia.query.filter_by(
+                grupo_id=grupo_id, cliente_id=est.id, fecha=fecha
+            ).first()
+            if reg:
+                reg.estado = estado
+                reg.observacion = observacion
+            else:
+                reg = AsistenciaDia(
+                    grupo_id=grupo_id, cliente_id=est.id,
+                    fecha=fecha, estado=estado, observacion=observacion
+                )
+                db.session.add(reg)
+        db.session.commit()
+        flash(f'✅ Asistencia del {fecha.strftime("%d/%m/%Y")} guardada.', 'success')
+        return redirect(url_for('docente_pase_lista', grupo_id=grupo_id,
+                                fecha=fecha.strftime('%Y-%m-%d')))
+
+    registros = {
+        r.cliente_id: r
+        for r in AsistenciaDia.query.filter_by(grupo_id=grupo_id, fecha=fecha).all()
+    }
+
+    return render_template(
+        'asistencia/pase_lista.html',
+        grupo=grupo,
+        estudiantes=estudiantes,
+        fecha=fecha,
+        registros=registros,
+        es_vista_docente=True
+    )
+
+
+#================================================================================================================================================================================
  #================================================================================================================================================================================       
 if __name__ == '__main__':
     import threading
@@ -3863,6 +4890,21 @@ if __name__ == '__main__':
             # Crear todas las tablas (es seguro, no borra datos)
             db.create_all()
             app.logger.info("✅ Estructura de base de datos verificada")
+
+            # ── Migración automática: agregar columnas que falten ──
+            try:
+                from sqlalchemy import text, inspect as sa_inspect
+                inspector = sa_inspect(db.engine)
+                cols_rh = [c['name'] for c in inspector.get_columns('registro_horas')]
+                if 'grupo_id' not in cols_rh:
+                    with db.engine.connect() as conn:
+                        conn.execute(text(
+                            "ALTER TABLE registro_horas ADD COLUMN grupo_id INTEGER REFERENCES grupo_asistencia(id)"
+                        ))
+                        conn.commit()
+                    app.logger.info("✅ Migración: columna grupo_id agregada a registro_horas")
+            except Exception as emig:
+                app.logger.warning(f"⚠️ Migración grupo_id: {emig}")
             
         except Exception as e:
             app.logger.error(f"❌ Error inicializando la base de datos: {e}")
@@ -3874,7 +4916,7 @@ if __name__ == '__main__':
     is_production = (env == 'production')
     
     host = '0.0.0.0' if is_production else '127.0.0.1'
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 8080))
     url = f"http://{host}:{port}"
     
     # Solo abrir navegador en desarrollo

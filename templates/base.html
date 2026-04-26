@@ -89,7 +89,44 @@
             </a>
             
             <hr style="border-color: rgba(255,255,255,0.2); margin: 15px 0;">
-            
+
+            <!-- MÓDULO ASISTENCIA -->
+            <div class="nav-section-label" style="color:rgba(255,255,255,0.5); font-size:10px; text-transform:uppercase; letter-spacing:1px; padding: 4px 16px 2px;">Asistencia</div>
+            <a class="nav-link {% if request.endpoint in ['asistencia_categorias','asistencia_categoria_nueva','asistencia_categoria_editar'] %}active{% endif %}"
+               href="{{ url_for('asistencia_categorias') }}">
+                <i class="bi bi-tags-fill"></i>
+                Categorías
+            </a>
+            <a class="nav-link {% if request.endpoint in ['asistencia_grupos','asistencia_grupo_nuevo','asistencia_grupo_editar','asistencia_grupo_estudiantes','asistencia_pase_lista','asistencia_reporte'] %}active{% endif %}"
+               href="{{ url_for('asistencia_grupos') }}">
+                <i class="bi bi-calendar2-check-fill"></i>
+                Grupos / Pase de lista
+            </a>
+
+            <hr style="border-color: rgba(255,255,255,0.2); margin: 15px 0;">
+
+            <!-- MÓDULO DOCENTES -->
+            <div class="nav-section-label" style="color:rgba(255,255,255,0.5); font-size:10px; text-transform:uppercase; letter-spacing:1px; padding: 4px 16px 2px;">Docentes</div>
+            <a class="nav-link {% if request.endpoint in ['docentes_lista','docente_nuevo','docente_editar','docente_horas'] %}active{% endif %}"
+               href="{{ url_for('docentes_lista') }}">
+                <i class="bi bi-person-badge-fill"></i>
+                Docentes y Horas
+            </a>
+
+            <hr style="border-color: rgba(255,255,255,0.2); margin: 15px 0;">
+
+            <!-- PORTAL DE PADRES — solo visible para admin -->
+            {% if session.get('rol') == 'admin' %}
+            <div class="nav-section-label" style="color:rgba(255,255,255,0.5); font-size:10px; text-transform:uppercase; letter-spacing:1px; padding: 4px 16px 2px;">Familias</div>
+            <a class="nav-link" href="{{ url_for('portal_padres') }}" target="_blank">
+                <i class="bi bi-people-fill"></i>
+                Portal de Padres
+                <i class="bi bi-box-arrow-up-right ms-1" style="font-size:10px;opacity:.7;"></i>
+            </a>
+            {% endif %}
+
+            <hr style="border-color: rgba(255,255,255,0.2); margin: 15px 0;">
+
             <a class="nav-link {% if request.endpoint == 'configuracion' %}active{% endif %}" 
                href="{{ url_for('configuracion') }}"
                aria-current="{% if request.endpoint == 'configuracion' %}page{% endif %}">

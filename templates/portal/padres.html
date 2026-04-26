@@ -1,0 +1,327 @@
+{# templates/portal/padres.html — Portal público para padres de familia #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Portal de Padres de Familia</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        body { background: #f0f4f8; min-height: 100vh; }
+        .portal-header {
+            background: linear-gradient(135deg, #1a3a5c 0%, #2563ab 100%);
+            color: white; padding: 2rem 0 1.5rem;
+        }
+        .portal-card {
+            border: none; border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+        }
+        .badge-P { background: #198754; }
+        .badge-A { background: #dc3545; }
+        .badge-T { background: #fd7e14; }
+        .badge-N { background: #0d6efd; }
+        .estado-al_dia    { color: #198754; }
+        .estado-pendiente { color: #fd7e14; }
+        .estado-vencido   { color: #dc3545; }
+        .pct-bar { height: 8px; border-radius: 4px; }
+        .day-badge {
+            display: inline-block; width: 28px; height: 28px;
+            border-radius: 50%; font-size: 0.72rem; line-height: 28px;
+            text-align: center; color: white; font-weight: 600;
+            margin: 2px;
+        }
+        .day-P { background: #198754; }
+        .day-A { background: #dc3545; }
+        .day-T { background: #fd7e14; }
+        .day-N { background: #0d6efd; }
+        .day-empty { background: #dee2e6; color: #6c757d; }
+    </style>
+</head>
+<body>
+
+{# ── Header ── #}
+<div class="portal-header mb-4">
+    <div class="container">
+        <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-people-fill fs-1"></i>
+            <div>
+                <h1 class="h3 mb-0 fw-bold">Portal de Padres de Familia</h1>
+                <p class="mb-0 opacity-75">Consulta asistencia y estado de pagos de tu hijo/a</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+
+    {# ── Formulario de búsqueda ── #}
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-6">
+            <div class="card portal-card p-4">
+                <h5 class="fw-bold mb-3">
+                    <i class="bi bi-search me-2 text-primary"></i>Buscar estudiante
+                </h5>
+                <form method="POST" action="{{ url_for('portal_padres') }}">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
+                        <input
+                            type="text"
+                            name="cedula"
+                            class="form-control form-control-lg {% if error %}is-invalid{% endif %}"
+                            placeholder="Ingresa el número de cédula"
+                            value="{{ cedula_buscada }}"
+                            autofocus
+                            maxlength="20"
+                        >
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-arrow-right-circle me-1"></i>Consultar
+                        </button>
+                        {% if error %}
+                        <div class="invalid-feedback">{{ error }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="form-text mt-2">
+                        <i class="bi bi-shield-lock me-1"></i>
+                        Solo necesitas la cédula del estudiante. No se requiere contraseña.
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# ── Resultados ── #}
+    {% if resultado %}
+    {% set est = resultado.estudiante %}
+    {% set mes_nombre = resultado.primer_dia.strftime('%B %Y') %}
+
+    {# — Encabezado del estudiante — #}
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-10">
+            <div class="card portal-card p-4 border-start border-5 border-primary">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
+                         style="width:56px;height:56px;font-size:1.6rem;">
+                        <i class="bi bi-person-fill"></i>
+                    </div>
+                    <div>
+                        <h4 class="fw-bold mb-0">
+                            {{ est.nombre }} {{ est.apellido }}
+                        </h4>
+                        <span class="text-muted">
+                            Cédula: {{ est.cedula or '—' }}
+                            {% if est.curso %}
+                            &nbsp;·&nbsp; Programa: <strong>{{ est.curso.nombre }}</strong>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center g-4">
+        <div class="col-md-10">
+
+            {# ══ SECCIÓN ASISTENCIA ══ #}
+            <div class="card portal-card mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-calendar-check me-2 text-success"></i>
+                        Asistencia — {{ mes_nombre }}
+                    </h5>
+                </div>
+                <div class="card-body">
+
+                    {# Leyenda #}
+                    <div class="d-flex flex-wrap gap-3 mb-4">
+                        <span class="badge bg-success px-3 py-2"><i class="bi bi-check-circle me-1"></i> Presente (P)</span>
+                        <span class="badge bg-danger px-3 py-2"><i class="bi bi-x-circle me-1"></i> Ausente (A)</span>
+                        <span class="badge bg-warning text-dark px-3 py-2"><i class="bi bi-clock me-1"></i> Atraso (T)</span>
+                        <span class="badge bg-primary px-3 py-2"><i class="bi bi-file-text me-1"></i> Con permiso (N)</span>
+                    </div>
+
+                    {% if resultado.resumen_grupos %}
+                        {% for rg in resultado.resumen_grupos %}
+                        <div class="mb-4 p-3 bg-light rounded-3">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <div>
+                                    <h6 class="fw-bold mb-0">{{ rg.grupo.nombre }}</h6>
+                                    <small class="text-muted">{{ rg.categoria }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <div class="fw-bold fs-5 {% if rg.pct_asistencia >= 80 %}text-success{% elif rg.pct_asistencia >= 60 %}text-warning{% else %}text-danger{% endif %}">
+                                        {{ rg.pct_asistencia }}%
+                                    </div>
+                                    <small class="text-muted">Asistencia</small>
+                                </div>
+                            </div>
+
+                            {# Barra de progreso #}
+                            <div class="progress pct-bar mb-3">
+                                <div class="progress-bar
+                                    {% if rg.pct_asistencia >= 80 %}bg-success
+                                    {% elif rg.pct_asistencia >= 60 %}bg-warning
+                                    {% else %}bg-danger{% endif %}"
+                                     style="width: {{ rg.pct_asistencia }}%">
+                                </div>
+                            </div>
+
+                            {# Contadores #}
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <span class="badge bg-success">✓ {{ rg.conteo.P }} Presentes</span>
+                                <span class="badge bg-danger">✗ {{ rg.conteo.A }} Ausentes</span>
+                                <span class="badge bg-warning text-dark">⏱ {{ rg.conteo.T }} Atrasos</span>
+                                <span class="badge bg-primary">📄 {{ rg.conteo.N }} Permisos</span>
+                                <span class="badge bg-secondary">Total: {{ rg.total_clases }} clases</span>
+                            </div>
+
+                            {# Detalle día a día #}
+                            {% if rg.asistencias %}
+                            <div>
+                                <small class="text-muted d-block mb-2">Detalle por día:</small>
+                                {% for a in rg.asistencias %}
+                                <span class="day-badge day-{{ a.estado }}"
+                                      title="{{ a.fecha.strftime('%d/%m') }} — {{ a.estado_texto if a.estado_texto is defined else a.estado }}">
+                                    {{ a.fecha.day }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-muted mb-0"><small>Sin registros de asistencia este mes.</small></p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-4 text-muted">
+                            <i class="bi bi-calendar-x fs-1 mb-2 d-block"></i>
+                            El estudiante no está inscrito en ningún grupo activo.
+                        </div>
+                    {% endif %}
+
+                </div>
+            </div>
+
+            {# ══ SECCIÓN MENSUALIDADES ══ #}
+            <div class="card portal-card">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-credit-card me-2 text-primary"></i>
+                        Estado de Mensualidades
+                    </h5>
+                </div>
+                <div class="card-body">
+
+                    {# Resumen financiero #}
+                    <div class="row g-3 mb-4">
+                        <div class="col-sm-4">
+                            <div class="text-center p-3 bg-light rounded-3">
+                                <div class="fs-4 fw-bold text-dark">${{ '%.2f'|format(resultado.total_programa) }}</div>
+                                <small class="text-muted">Total programa</small>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="text-center p-3 bg-light rounded-3">
+                                <div class="fs-4 fw-bold text-success">${{ '%.2f'|format(resultado.total_pagado) }}</div>
+                                <small class="text-muted">Total pagado</small>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="text-center p-3 rounded-3
+                                {% if resultado.saldo_pendiente <= 0 %}bg-success bg-opacity-10
+                                {% else %}bg-danger bg-opacity-10{% endif %}">
+                                <div class="fs-4 fw-bold
+                                    {% if resultado.saldo_pendiente <= 0 %}text-success
+                                    {% else %}text-danger{% endif %}">
+                                    ${{ '%.2f'|format(resultado.saldo_pendiente|abs) }}
+                                </div>
+                                <small class="text-muted">
+                                    {% if resultado.saldo_pendiente <= 0 %}Sin saldo pendiente{% else %}Saldo pendiente{% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    {# Estado general — estado_pago usa guión: 'al-dia', 'por-vencer', 'vencido', 'sin-cobertura', 'pendiente-inicio' #}
+                    {% set ep = resultado.estado_pago %}
+                    <div class="alert
+                        {% if ep in ['al-dia', 'pendiente-inicio'] or resultado.saldo_pendiente <= 0 %}alert-success
+                        {% elif ep == 'por-vencer' %}alert-warning
+                        {% elif ep == 'vencido' %}alert-danger
+                        {% else %}alert-secondary{% endif %} d-flex align-items-center mb-4">
+                        <i class="bi
+                            {% if ep in ['al-dia', 'pendiente-inicio'] or resultado.saldo_pendiente <= 0 %}bi-check-circle-fill
+                            {% elif ep == 'por-vencer' %}bi-exclamation-triangle-fill
+                            {% elif ep == 'vencido' %}bi-x-octagon-fill
+                            {% else %}bi-dash-circle{% endif %} me-2 fs-5"></i>
+                        <div>
+                            <strong>Estado:</strong>
+                            {% if resultado.saldo_pendiente <= 0 and ep != 'sin-cobertura' %}
+                                Al día — sin pagos pendientes
+                            {% elif ep == 'al-dia' %}Al día — sin pagos pendientes
+                            {% elif ep == 'pendiente-inicio' %}Pagado — en espera de inicio de clases
+                            {% elif ep == 'por-vencer' %}Próximo a vencer — renueva pronto
+                            {% elif ep == 'vencido' %}Plan vencido — requiere pago
+                            {% else %}Sin cobertura activa
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {# Últimos pagos #}
+                    {% if resultado.pagos_recientes %}
+                    <h6 class="fw-bold mb-3">Últimos pagos registrados</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Concepto</th>
+                                    <th class="text-end">Monto</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pago in resultado.pagos_recientes %}
+                                <tr>
+                                    <td>{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</td>
+                                    <td>{{ pago.concepto or 'Mensualidad' }}</td>
+                                    <td class="text-end fw-bold text-success">${{ '%.2f'|format(pago.monto) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center py-3">
+                        <i class="bi bi-inbox me-1"></i>No hay pagos registrados aún.
+                    </p>
+                    {% endif %}
+
+                    {# ── Botón descargar PDF ── #}
+                    <div class="mt-4 pt-3 border-top text-center">
+                        <a href="{{ url_for('portal_padres_pdf', cedula=resultado.estudiante.cedula) }}"
+                           class="btn btn-outline-primary btn-lg"
+                           target="_blank">
+                            <i class="bi bi-file-earmark-pdf me-2"></i>Descargar resumen en PDF
+                        </a>
+                        <p class="text-muted small mt-2 mb-0">
+                            <i class="bi bi-shield-lock me-1"></i>Accede al PDF con la cédula del estudiante.
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+{# ── Footer #}
+<footer class="text-center text-muted py-4 mt-4 border-top">
+    <small>Portal de consulta para padres de familia &nbsp;·&nbsp; Solo lectura, información privada</small>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
