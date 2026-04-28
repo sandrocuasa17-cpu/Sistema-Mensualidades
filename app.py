@@ -4275,11 +4275,30 @@ def asistencia_pase_lista(grupo_id):
         for r in AsistenciaDia.query.filter_by(grupo_id=grupo_id, fecha=fecha).all()
     }
 
+    # Calendario del mes: mapa {date: AsistenciaDia} para colorear el widget
+    import calendar as _cal
+    num_dias_mes = _cal.monthrange(fecha.year, fecha.month)[1]
+    primer_dia_mes = fecha.replace(day=1)
+    ultimo_dia_mes = fecha.replace(day=num_dias_mes)
+    registros_mes = AsistenciaDia.query.filter(
+        AsistenciaDia.grupo_id == grupo_id,
+        AsistenciaDia.fecha >= primer_dia_mes,
+        AsistenciaDia.fecha <= ultimo_dia_mes
+    ).all()
+    # Un registro por día (el primero encontrado) para colorear el calendario
+    calendario = {}
+    for r in registros_mes:
+        if r.fecha not in calendario:
+            calendario[r.fecha] = r
+
     return render_template('asistencia/pase_lista.html',
                            grupo=grupo,
                            estudiantes=estudiantes,
                            fecha=fecha,
-                           registros=registros)
+                           registros=registros,
+                           calendario=calendario,
+                           num_dias_mes=num_dias_mes,
+                           es_vista_docente=False)
 
 
 @app.route('/asistencia/grupos/<int:grupo_id>/reporte')
@@ -4852,12 +4871,29 @@ def docente_pase_lista(grupo_id):
         for r in AsistenciaDia.query.filter_by(grupo_id=grupo_id, fecha=fecha).all()
     }
 
+    # Calendario del mes: mapa {date: AsistenciaDia} para colorear el widget
+    import calendar as _cal
+    num_dias_mes = _cal.monthrange(fecha.year, fecha.month)[1]
+    primer_dia_mes = fecha.replace(day=1)
+    ultimo_dia_mes = fecha.replace(day=num_dias_mes)
+    registros_mes = AsistenciaDia.query.filter(
+        AsistenciaDia.grupo_id == grupo_id,
+        AsistenciaDia.fecha >= primer_dia_mes,
+        AsistenciaDia.fecha <= ultimo_dia_mes
+    ).all()
+    calendario = {}
+    for r in registros_mes:
+        if r.fecha not in calendario:
+            calendario[r.fecha] = r
+
     return render_template(
         'asistencia/pase_lista.html',
         grupo=grupo,
         estudiantes=estudiantes,
         fecha=fecha,
         registros=registros,
+        calendario=calendario,
+        num_dias_mes=num_dias_mes,
         es_vista_docente=True
     )
 

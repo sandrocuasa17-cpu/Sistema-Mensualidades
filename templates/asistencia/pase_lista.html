@@ -2,195 +2,525 @@
 {% block title %}Pase de Lista — {{ grupo.nombre }}{% endblock %}
 
 {% block extra_css %}
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-.estado-btn { min-width: 40px; font-size: 13px; }
-.estado-btn.activo-P { background: #198754; color: #fff; border-color: #198754; }
-.estado-btn.activo-A { background: #dc3545; color: #fff; border-color: #dc3545; }
-.estado-btn.activo-T { background: #ffc107; color: #000; border-color: #ffc107; }
-.estado-btn.activo-N { background: #0dcaf0; color: #000; border-color: #0dcaf0; }
-.fila-estudiante { transition: background .2s; }
-.fila-P { background: rgba(25,135,84,.07); }
-.fila-A { background: rgba(220,53,69,.07); }
-.fila-T { background: rgba(255,193,7,.07); }
-.fila-N { background: rgba(13,202,240,.07); }
-.badge-pago { font-size: 10px; }
+  :root {
+    --verde:   #16a34a;
+    --rojo:    #dc2626;
+    --ambar:   #d97706;
+    --azul:    #2563eb;
+    --gris:    #e5e7eb;
+    --txt:     #111827;
+    --txt-sub: #6b7280;
+    --bg:      #f9fafb;
+    --card-bg: #ffffff;
+    --radius:  14px;
+    --shadow:  0 2px 16px rgba(0,0,0,.07);
+  }
+
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--txt); }
+
+  /* ── CALENDAR ─────────────────────────────── */
+  .cal-wrapper {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.1rem 1.4rem;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+    color: #fff;
+  }
+  .cal-header h5 { margin: 0; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 1.05rem; letter-spacing: .3px; }
+  .cal-nav-btn {
+    background: rgba(255,255,255,.18);
+    border: none;
+    color: #fff;
+    border-radius: 8px;
+    width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: background .2s;
+    text-decoration: none;
+  }
+  .cal-nav-btn:hover { background: rgba(255,255,255,.32); color: #fff; }
+
+  .cal-grid {
+    padding: .9rem 1rem 1rem;
+  }
+  .cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    margin-bottom: .4rem;
+  }
+  .cal-weekday {
+    font-size: .72rem;
+    font-weight: 600;
+    color: var(--txt-sub);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: .3rem 0;
+  }
+  .cal-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .cal-day {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    font-size: .8rem;
+    font-weight: 500;
+    cursor: default;
+    position: relative;
+    transition: transform .15s;
+    min-height: 46px;
+  }
+  .cal-day.empty { background: transparent; }
+  .cal-day.no-class { background: #f3f4f6; color: #9ca3af; }
+  .cal-day.today-marker { box-shadow: 0 0 0 2px #2563eb; }
+
+  /* Estado colores */
+  .cal-day.st-P { background: #dcfce7; color: #166534; }
+  .cal-day.st-A { background: #fee2e2; color: #991b1b; }
+  .cal-day.st-T { background: #fef9c3; color: #854d0e; }
+  .cal-day.st-N { background: #dbeafe; color: #1e40af; }
+  .cal-day.st-P:hover, .cal-day.st-A:hover, .cal-day.st-T:hover, .cal-day.st-N:hover {
+    transform: scale(1.08);
+    z-index: 2;
+  }
+
+  .cal-day .day-num { font-size: .82rem; font-weight: 700; line-height: 1; }
+  .cal-day .day-lbl { font-size: .6rem; font-weight: 700; letter-spacing: .3px; margin-top: 2px; }
+  .cal-day .day-dot  { width: 6px; height: 6px; border-radius: 50%; margin-top: 2px; }
+  .cal-day.st-P .day-dot { background: #16a34a; }
+  .cal-day.st-A .day-dot { background: #dc2626; }
+  .cal-day.st-T .day-dot { background: #d97706; }
+  .cal-day.st-N .day-dot { background: #2563eb; }
+
+  /* Tooltip de materia en celdas */
+  .cal-day[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1f2937;
+    color: #fff;
+    font-size: .68rem;
+    white-space: nowrap;
+    padding: 3px 8px;
+    border-radius: 6px;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* ── TABLA DE ASISTENCIA INTERACTIVA ───────── */
+  .lista-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .lista-header {
+    padding: 1rem 1.4rem;
+    background: #f8fafc;
+    border-bottom: 1.5px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+  .lista-header h5 { margin: 0; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: .95rem; }
+
+  .student-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 1rem;
+    padding: .75rem 1.4rem;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background .15s;
+  }
+  .student-row:last-child { border-bottom: none; }
+  .student-row:hover { background: #f9fafb; }
+  .student-row.fila-P { background: rgba(22,163,74,.04); }
+  .student-row.fila-A { background: rgba(220,38,38,.04); }
+  .student-row.fila-T { background: rgba(217,119,6,.04); }
+  .student-row.fila-N { background: rgba(37,99,235,.04); }
+
+  .student-name { font-weight: 600; font-size: .9rem; }
+  .student-meta { font-size: .75rem; color: var(--txt-sub); }
+
+  .btn-estado {
+    width: 38px; height: 38px;
+    border-radius: 10px;
+    border: 2px solid transparent;
+    font-weight: 700; font-size: .78rem;
+    cursor: pointer;
+    transition: all .15s;
+    background: #f3f4f6;
+    color: #6b7280;
+  }
+  .btn-estado:hover { transform: scale(1.1); }
+  .btn-estado.activo-P { background: var(--verde); color: #fff; border-color: #15803d; }
+  .btn-estado.activo-A { background: var(--rojo);  color: #fff; border-color: #b91c1c; }
+  .btn-estado.activo-T { background: var(--ambar); color: #fff; border-color: #b45309; }
+  .btn-estado.activo-N { background: var(--azul);  color: #fff; border-color: #1d4ed8; }
+
+  .obs-input {
+    border: 1.5px solid #e5e7eb;
+    border-radius: 8px;
+    padding: .3rem .6rem;
+    font-size: .8rem;
+    width: 140px;
+    transition: border .2s;
+  }
+  .obs-input:focus { border-color: #2563eb; outline: none; }
+
+  /* ── LEYENDA ───────────────────────────────── */
+  .leyenda { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .leyenda-item {
+    display: flex; align-items: center; gap: .35rem;
+    font-size: .78rem; font-weight: 600;
+  }
+  .leyenda-dot { width: 12px; height: 12px; border-radius: 4px; }
+  .l-P { background: #dcfce7; border: 1.5px solid var(--verde); }
+  .l-A { background: #fee2e2; border: 1.5px solid var(--rojo); }
+  .l-T { background: #fef9c3; border: 1.5px solid var(--ambar); }
+  .l-N { background: #dbeafe; border: 1.5px solid var(--azul); }
+
+  /* ── RESUMEN CHIPS ─────────────────────────── */
+  .resumen-chips { display: flex; gap: .5rem; flex-wrap: wrap; }
+  .chip {
+    padding: .3rem .75rem;
+    border-radius: 20px;
+    font-size: .8rem;
+    font-weight: 600;
+  }
+  .chip-P { background: #dcfce7; color: #166534; }
+  .chip-A { background: #fee2e2; color: #991b1b; }
+  .chip-T { background: #fef9c3; color: #854d0e; }
+  .chip-N { background: #dbeafe; color: #1e40af; }
+
+  /* ── BÚSQUEDA RÁPIDA ───────────────────────── */
+  .search-bar {
+    display: flex; align-items: center;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    padding: .3rem .7rem;
+    background: #fff;
+    gap: .4rem;
+  }
+  .search-bar input {
+    border: none; outline: none;
+    font-size: .85rem;
+    width: 160px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--txt);
+  }
+  .search-bar i { color: var(--txt-sub); }
+
+  /* ── MARCAR TODOS ──────────────────────────── */
+  .mass-btn {
+    padding: .35rem .9rem;
+    border-radius: 8px;
+    font-size: .8rem;
+    font-weight: 600;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .mass-P { background: #dcfce7; color: #166534; border-color: #86efac; }
+  .mass-P:hover { background: var(--verde); color: #fff; }
+  .mass-A { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+  .mass-A:hover { background: var(--rojo); color: #fff; }
+
+  /* Animación entrada */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .animate-in { animation: fadeIn .3s ease both; }
+
+  @media (max-width: 640px) {
+    .obs-input { width: 90px; }
+    .student-row { grid-template-columns: 1fr; gap: .4rem; }
+    .btn-estado { width: 34px; height: 34px; font-size: .72rem; }
+  }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
 
-  <!-- Encabezado -->
-  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
-    <div class="d-flex align-items-center gap-2">
-      <a href="{{ url_for('docente_mi_lista') if es_vista_docente else url_for('asistencia_grupos') }}" class="btn btn-outline-secondary btn-sm">
+  {# ─── ENCABEZADO ─── #}
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div class="d-flex align-items-center gap-3">
+      <a href="{{ url_for('docente_mi_lista') if es_vista_docente else url_for('asistencia_grupos') }}"
+         class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-arrow-left"></i>
       </a>
       <div>
-        <h3 class="mb-0"><i class="bi bi-clipboard2-check-fill text-success me-2"></i>Pase de Lista</h3>
-        <small class="text-muted">
-          <span class="badge" style="background:linear-gradient(135deg,#667eea,#764ba2);">{{ grupo.categoria.nombre }}</span>
-          &nbsp;{{ grupo.nombre }}
-        </small>
+        <h3 class="mb-0" style="font-family:'Space Grotesk',sans-serif; font-weight:700;">
+          <i class="bi bi-clipboard2-check-fill text-success me-2"></i>Pase de Lista
+        </h3>
+        <div class="d-flex align-items-center gap-2 mt-1">
+          <span class="badge text-white" style="background:linear-gradient(135deg,#1e3a5f,#2563eb); font-size:.75rem;">
+            {{ grupo.categoria.nombre }}
+          </span>
+          <span class="fw-semibold" style="font-size:.9rem;">{{ grupo.nombre }}</span>
+        </div>
       </div>
     </div>
-    <!-- Selector de fecha -->
+
+    {# Selector de fecha #}
     <form method="GET" class="d-flex align-items-center gap-2">
-      <label class="fw-semibold small mb-0">Fecha:</label>
+      <label class="fw-semibold small mb-0 text-muted">Fecha:</label>
       <input type="date" name="fecha" class="form-control form-control-sm"
              value="{{ fecha.strftime('%Y-%m-%d') }}"
              max="{{ now().strftime('%Y-%m-%d') }}"
+             style="border-radius:10px; border:1.5px solid #e5e7eb;"
              onchange="this.form.submit()">
     </form>
   </div>
 
-  <!-- Fecha actual y leyenda -->
-  <div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
-    <strong class="me-2">📅 {{ fecha.strftime('%A %d de %B de %Y').capitalize() }}</strong>
-    <span class="badge bg-success">P — Presente</span>
-    <span class="badge bg-danger">A — Ausente</span>
-    <span class="badge bg-warning text-dark">T — Atraso</span>
-    <span class="badge bg-info text-dark">N — Con permiso</span>
-  </div>
+  {# ─── VISTA DE CALENDARIO ─── #}
+  <div class="row g-4 mb-4 animate-in">
+    <div class="col-lg-4">
+      <div class="cal-wrapper">
+        {# Navegación mes #}
+        {% set mes_actual = fecha.month %}
+        {% set anio_actual = fecha.year %}
+        {% set mes_ant = mes_actual - 1 if mes_actual > 1 else 12 %}
+        {% set anio_ant = anio_actual if mes_actual > 1 else anio_actual - 1 %}
+        {% set mes_sig = mes_actual + 1 if mes_actual < 12 else 1 %}
+        {% set anio_sig = anio_actual if mes_actual < 12 else anio_actual + 1 %}
 
-  {% if estudiantes %}
+        <div class="cal-header">
+          <a href="?fecha={{ anio_ant }}-{{ '%02d'|format(mes_ant) }}-01" class="cal-nav-btn">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+          <h5>
+            {{ ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][mes_actual-1] }}
+            {{ anio_actual }}
+          </h5>
+          <a href="?fecha={{ anio_sig }}-{{ '%02d'|format(mes_sig) }}-01" class="cal-nav-btn">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </div>
 
-  <!-- Barra de acción masiva -->
-  <div class="card border-0 shadow-sm mb-3">
-    <div class="card-body py-2 d-flex flex-wrap gap-2 align-items-center">
-      <span class="small fw-semibold text-muted me-1">Marcar todos:</span>
-      <button type="button" class="btn btn-sm btn-success" onclick="marcarTodos('P')">
-        <i class="bi bi-check-all"></i> Todos Presentes
-      </button>
-      <button type="button" class="btn btn-sm btn-danger" onclick="marcarTodos('A')">
-        <i class="bi bi-x-lg"></i> Todos Ausentes
-      </button>
-      <div class="ms-auto small text-muted">
-        {{ estudiantes|length }} estudiante(s)
+        <div class="cal-grid">
+          <div class="cal-weekdays">
+            {% for d in ['Lu','Ma','Mi','Ju','Vi','Sa','Do'] %}
+            <div class="cal-weekday">{{ d }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="cal-days" id="calDays">
+            {# fecha puede llegar como date o datetime — usamos replace(day=1) directo #}
+            {% set primer_dia_mes = fecha.replace(day=1) %}
+            {% set offset = primer_dia_mes.weekday() %}
+            {% for _ in range(offset) %}
+            <div class="cal-day empty"></div>
+            {% endfor %}
+
+            {# num_dias_mes debe venir desde Python; fallback a 31 #}
+            {% set num_dias = num_dias_mes if num_dias_mes is defined else 31 %}
+            {% for d in range(1, num_dias + 1) %}
+              {% set this_date = primer_dia_mes.replace(day=d) %}
+              {% set reg = calendario.get(this_date) if calendario is defined else None %}
+              {% set is_today = this_date == now().date() %}
+              {% set is_fecha_sel = this_date == fecha %}
+              <div class="cal-day
+                {% if reg %}st-{{ reg.estado }}{% else %}no-class{% endif %}
+                {% if is_today %}today-marker{% endif %}"
+                {% if reg and reg.materia %}title="{{ reg.materia }}"{% endif %}
+              >
+                <span class="day-num">{{ d }}</span>
+                {% if reg %}
+                  <span class="day-lbl">{{ reg.estado }}</span>
+                  <span class="day-dot"></span>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        {# Leyenda bajo el calendario #}
+        <div class="px-3 pb-3">
+          <div class="leyenda">
+            <div class="leyenda-item"><div class="leyenda-dot l-P"></div>Presente</div>
+            <div class="leyenda-item"><div class="leyenda-dot l-A"></div>Ausente</div>
+            <div class="leyenda-item"><div class="leyenda-dot l-T"></div>Atraso</div>
+            <div class="leyenda-item"><div class="leyenda-dot l-N"></div>Permiso</div>
+          </div>
+        </div>
       </div>
+
+      {# Resumen del día seleccionado #}
+      {% if estudiantes %}
+      <div class="mt-3 p-3 rounded-3" style="background:#fff; box-shadow: var(--shadow);">
+        <div class="fw-semibold small text-muted mb-2" style="font-family:'Space Grotesk',sans-serif;">
+          📅 {{ fecha.strftime('%A %d de %B de %Y').capitalize() }}
+        </div>
+        <div class="resumen-chips" id="resumenChips">
+          <span class="chip chip-P" id="cnt-P">P: 0</span>
+          <span class="chip chip-A" id="cnt-A">A: 0</span>
+          <span class="chip chip-T" id="cnt-T">T: 0</span>
+          <span class="chip chip-N" id="cnt-N">N: 0</span>
+        </div>
+      </div>
+      {% endif %}
     </div>
-  </div>
 
-  <form method="POST">
-    <input type="hidden" name="guardar_lista" value="1">
-    <input type="hidden" name="fecha" value="{{ fecha.strftime('%Y-%m-%d') }}">
+    {# ─── LISTA DE ASISTENCIA ─── #}
+    {% if estudiantes %}
+    <div class="col-lg-8">
+      <form method="POST" id="formLista">
+        <input type="hidden" name="guardar_lista" value="1">
+        <input type="hidden" name="fecha" value="{{ fecha.strftime('%Y-%m-%d') }}">
 
-    <div class="card border-0 shadow-sm">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th style="width:40%">Estudiante</th>
-              <th class="text-center">Estado</th>
-              <th>Observación</th>
-            </tr>
-          </thead>
-          <tbody id="tablaLista">
+        <div class="lista-card">
+          <div class="lista-header">
+            <h5><i class="bi bi-people-fill text-primary me-2"></i>{{ estudiantes|length }} estudiante(s)</h5>
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+              {# Búsqueda rápida #}
+              <div class="search-bar">
+                <i class="bi bi-search"></i>
+                <input type="text" id="buscarEst" placeholder="Buscar...">
+              </div>
+              {# Marcar todos #}
+              <button type="button" class="mass-btn mass-P" onclick="marcarTodos('P')">
+                <i class="bi bi-check-all me-1"></i>Todos P
+              </button>
+              <button type="button" class="mass-btn mass-A" onclick="marcarTodos('A')">
+                <i class="bi bi-x-lg me-1"></i>Todos A
+              </button>
+            </div>
+          </div>
+
+          <div id="listaBody">
             {% for est in estudiantes %}
             {% set reg = registros.get(est.id) %}
             {% set estado_actual = reg.estado if reg else 'P' %}
-            <tr class="fila-estudiante fila-{{ estado_actual }}" id="fila-{{ est.id }}">
-              <td>
-                <strong>{{ est.nombre }} {{ est.apellido }}</strong>
-                <br>
-                <small class="text-muted">
+            <div class="student-row fila-{{ estado_actual }}" id="fila-{{ est.id }}" data-nombre="{{ est.nombre|lower }} {{ est.apellido|lower }}">
+              <div>
+                <div class="student-name">{{ est.nombre }} {{ est.apellido }}</div>
+                <div class="student-meta">
                   {% if est.cedula %}CI: {{ est.cedula }}{% endif %}
-                  {% if est.estado_pago in ['vencido', 'sin-cobertura'] %}
-                  &nbsp;<span class="badge bg-danger badge-pago">⚠ Pago</span>
+                  {% if est.estado_pago in ['vencido','sin-cobertura'] %}
+                  &nbsp;<span class="badge bg-danger" style="font-size:.65rem;">⚠ Pago</span>
                   {% elif est.estado_pago == 'por-vencer' %}
-                  &nbsp;<span class="badge bg-warning text-dark badge-pago">Por vencer</span>
+                  &nbsp;<span class="badge bg-warning text-dark" style="font-size:.65rem;">Por vencer</span>
                   {% endif %}
-                </small>
-                <!-- Campo oculto con el estado -->
-                <input type="hidden" name="estado_{{ est.id }}" id="estado_{{ est.id }}"
-                       value="{{ estado_actual }}">
-              </td>
-              <td class="text-center">
-                <div class="btn-group btn-group-sm" role="group">
-                  {% for codigo, label, cls in [('P','P','success'),('A','A','danger'),('T','T','warning'),('N','N','info')] %}
-                  <button type="button"
-                          class="estado-btn btn btn-outline-{{ cls }} {% if estado_actual == codigo %}activo-{{ codigo }}{% endif %}"
-                          data-id="{{ est.id }}"
-                          data-estado="{{ codigo }}"
-                          onclick="setEstado({{ est.id }}, '{{ codigo }}')">
-                    {{ label }}
-                  </button>
-                  {% endfor %}
                 </div>
-              </td>
-              <td>
-                <input type="text" name="obs_{{ est.id }}" class="form-control form-control-sm"
-                       value="{{ reg.observacion if reg and reg.observacion else '' }}"
-                       placeholder="Observación...">
-              </td>
-            </tr>
+                <input type="hidden" name="estado_{{ est.id }}" id="estado_{{ est.id }}" value="{{ estado_actual }}">
+              </div>
+
+              {# Botones de estado #}
+              <div class="d-flex gap-1">
+                {% for codigo, cls in [('P','P'),('A','A'),('T','T'),('N','N')] %}
+                <button type="button"
+                        class="btn-estado {% if estado_actual == codigo %}activo-{{ codigo }}{% endif %}"
+                        data-id="{{ est.id }}" data-estado="{{ codigo }}"
+                        onclick="setEstado({{ est.id }}, '{{ codigo }}')">
+                  {{ codigo }}
+                </button>
+                {% endfor %}
+              </div>
+
+              {# Observación #}
+              <input type="text" name="obs_{{ est.id }}" class="obs-input"
+                     value="{{ reg.observacion if reg and reg.observacion else '' }}"
+                     placeholder="Observación...">
+            </div>
             {% endfor %}
-          </tbody>
-        </table>
+          </div>
+        </div>
+
+        <div class="mt-3 d-flex gap-2 flex-wrap">
+          <button type="submit" class="btn btn-primary btn-lg px-4" style="border-radius:12px; font-weight:600;">
+            <i class="bi bi-save-fill me-2"></i>Guardar Asistencia
+          </button>
+          <a href="{{ url_for('asistencia_reporte', grupo_id=grupo.id) }}" class="btn btn-outline-info" style="border-radius:12px;">
+            <i class="bi bi-bar-chart-fill me-1"></i>Ver reporte
+          </a>
+          {% if es_vista_docente %}
+          <a href="{{ url_for('docente_mis_horas', grupo_id=grupo.id) }}" class="btn btn-outline-success" style="border-radius:12px;">
+            <i class="bi bi-clock-fill me-1"></i>Registrar mis horas
+          </a>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+
+    {% else %}
+    <div class="col-lg-8">
+      <div class="lista-card d-flex flex-column align-items-center justify-content-center py-5 text-muted">
+        <i class="bi bi-person-x" style="font-size:3.5rem;opacity:.25;"></i>
+        <p class="mt-3 fs-5 mb-3">No hay estudiantes en este grupo.</p>
+        <a href="{{ url_for('asistencia_grupo_estudiantes', id=grupo.id) }}" class="btn btn-primary">
+          <i class="bi bi-person-plus-fill me-1"></i> Agregar estudiantes
+        </a>
       </div>
     </div>
-
-    <div class="mt-3 d-flex gap-2 flex-wrap">
-      <button type="submit" class="btn btn-primary btn-lg">
-        <i class="bi bi-save-fill me-1"></i> Guardar Asistencia
-      </button>
-      <a href="{{ url_for('asistencia_reporte', grupo_id=grupo.id) }}" class="btn btn-outline-info">
-        <i class="bi bi-bar-chart-fill me-1"></i> Ver reporte
-      </a>
-      {% if es_vista_docente %}
-      <a href="{{ url_for('docente_mis_horas', grupo_id=grupo.id) }}" class="btn btn-outline-success">
-        <i class="bi bi-clock-fill me-1"></i> Registrar mis horas de hoy
-      </a>
-      {% endif %}
-    </div>
-  </form>
-
-  {% else %}
-  <div class="text-center py-5 text-muted">
-    <i class="bi bi-person-x" style="font-size:4rem;opacity:.3"></i>
-    <p class="mt-3 fs-5">No hay estudiantes en este grupo.</p>
-    <a href="{{ url_for('asistencia_grupo_estudiantes', id=grupo.id) }}" class="btn btn-primary">
-      <i class="bi bi-person-plus-fill me-1"></i> Agregar estudiantes
-    </a>
+    {% endif %}
   </div>
-  {% endif %}
 
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-const colores = {
-  'P': 'success', 'A': 'danger', 'T': 'warning', 'N': 'info'
-};
-const claseFila = {
-  'P': 'fila-P', 'A': 'fila-A', 'T': 'fila-T', 'N': 'fila-N'
-};
+const colores = { 'P':'P','A':'A','T':'T','N':'N' };
 
 function setEstado(id, estado) {
-  // Actualizar hidden input
   document.getElementById('estado_' + id).value = estado;
-
-  // Actualizar estilo de fila
   const fila = document.getElementById('fila-' + id);
-  fila.className = 'fila-estudiante ' + claseFila[estado];
-
-  // Actualizar botones del grupo
-  const btns = fila.querySelectorAll('.estado-btn');
+  fila.className = fila.className.replace(/fila-[PATN]/, 'fila-' + estado);
+  const btns = fila.querySelectorAll('.btn-estado');
   btns.forEach(btn => {
     const e = btn.dataset.estado;
-    btn.className = 'estado-btn btn btn-outline-' + colores[e];
-    if (e === estado) btn.classList.add('activo-' + estado);
+    btn.className = 'btn-estado' + (e === estado ? ' activo-' + e : '');
   });
+  actualizarResumen();
 }
 
 function marcarTodos(estado) {
   document.querySelectorAll('[data-estado]').forEach(btn => {
-    if (btn.dataset.estado === estado) {
-      const id = btn.dataset.id;
-      setEstado(id, estado);
-    }
+    if (btn.dataset.estado === estado) setEstado(btn.dataset.id, estado);
   });
 }
+
+function actualizarResumen() {
+  const cnt = {P:0,A:0,T:0,N:0};
+  document.querySelectorAll('[id^="estado_"]').forEach(inp => {
+    const v = inp.value;
+    if (cnt[v] !== undefined) cnt[v]++;
+  });
+  ['P','A','T','N'].forEach(k => {
+    const el = document.getElementById('cnt-' + k);
+    if (el) el.textContent = k + ': ' + cnt[k];
+  });
+}
+
+// Búsqueda rápida
+document.getElementById('buscarEst')?.addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.student-row').forEach(row => {
+    row.style.display = row.dataset.nombre.includes(q) ? '' : 'none';
+  });
+});
+
+// Inicializar resumen al cargar
+document.addEventListener('DOMContentLoaded', actualizarResumen);
 </script>
 {% endblock %}

@@ -1,326 +1,622 @@
-{# templates/portal/padres.html — Portal público para padres de familia #}
+{# templates/portal/padres.html — Portal mejorado para padres de familia #}
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Portal de Padres de Familia</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <style>
-        body { background: #f0f4f8; min-height: 100vh; }
-        .portal-header {
-            background: linear-gradient(135deg, #1a3a5c 0%, #2563ab 100%);
-            color: white; padding: 2rem 0 1.5rem;
-        }
-        .portal-card {
-            border: none; border-radius: 16px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-        }
-        .badge-P { background: #198754; }
-        .badge-A { background: #dc3545; }
-        .badge-T { background: #fd7e14; }
-        .badge-N { background: #0d6efd; }
-        .estado-al_dia    { color: #198754; }
-        .estado-pendiente { color: #fd7e14; }
-        .estado-vencido   { color: #dc3545; }
-        .pct-bar { height: 8px; border-radius: 4px; }
-        .day-badge {
-            display: inline-block; width: 28px; height: 28px;
-            border-radius: 50%; font-size: 0.72rem; line-height: 28px;
-            text-align: center; color: white; font-weight: 600;
-            margin: 2px;
-        }
-        .day-P { background: #198754; }
-        .day-A { background: #dc3545; }
-        .day-T { background: #fd7e14; }
-        .day-N { background: #0d6efd; }
-        .day-empty { background: #dee2e6; color: #6c757d; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="theme-color" content="#1e3a5f">
+  <title>Portal de Padres — Consulta de Asistencia</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --brand:    #1e3a5f;
+      --brand2:   #2563eb;
+      --verde:    #16a34a;
+      --rojo:     #dc2626;
+      --ambar:    #d97706;
+      --azul-cl:  #2563eb;
+      --bg:       #f1f5f9;
+      --card:     #ffffff;
+      --radius:   16px;
+      --shadow:   0 4px 24px rgba(30,58,95,.09);
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      color: #1e293b;
+    }
+
+    /* ─── HEADER ─── */
+    .portal-header {
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand2) 100%);
+      color: #fff;
+      padding: 2.5rem 0 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .portal-header::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 260px; height: 260px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.06);
+    }
+    .portal-header::after {
+      content: '';
+      position: absolute;
+      bottom: -80px; left: 10%;
+      width: 180px; height: 180px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.04);
+    }
+    .portal-header h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1.6rem;
+      margin: 0;
+    }
+    .portal-header p { margin: .3rem 0 0; opacity: .8; font-size: .9rem; }
+
+    /* ─── SEARCH CARD ─── */
+    .search-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 2rem;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+    .search-card h5 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      color: var(--brand);
+      font-size: 1.05rem;
+    }
+    .search-input-wrap {
+      display: flex;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+    .search-input-wrap:focus-within { border-color: var(--brand2); }
+    .search-input-wrap .prefix {
+      background: #f8fafc;
+      padding: 0 1rem;
+      display: flex; align-items: center;
+      color: #94a3b8;
+      border-right: 2px solid #e2e8f0;
+      font-size: 1.1rem;
+    }
+    .search-input-wrap input {
+      flex: 1;
+      border: none; outline: none;
+      padding: .75rem 1rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      color: #1e293b;
+    }
+    .btn-consultar {
+      background: linear-gradient(135deg, var(--brand), var(--brand2));
+      color: #fff;
+      border: none;
+      padding: .75rem 1.5rem;
+      font-weight: 700;
+      font-size: .95rem;
+      cursor: pointer;
+      transition: opacity .2s;
+      white-space: nowrap;
+    }
+    .btn-consultar:hover { opacity: .88; }
+
+    /* ─── STUDENT CARD ─── */
+    .student-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      border-left: 5px solid var(--brand2);
+    }
+    .avatar {
+      width: 58px; height: 58px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--brand), var(--brand2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem;
+      color: #fff;
+      flex-shrink: 0;
+    }
+
+    /* ─── SECCIÓN CALENDARIO ─── */
+    .section-card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .section-header {
+      padding: 1.1rem 1.5rem;
+      background: linear-gradient(135deg, var(--brand) 0%, var(--brand2) 100%);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .section-header h5 {
+      margin: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: .95rem;
+    }
+
+    /* ─── CALENDARIO ─── */
+    .cal-nav {
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .cal-nav-btn {
+      background: rgba(255,255,255,.2);
+      border: none;
+      color: #fff;
+      border-radius: 8px;
+      width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background .2s;
+      font-size: .85rem;
+    }
+    .cal-nav-btn:hover { background: rgba(255,255,255,.35); color: #fff; }
+    .cal-mes-label { font-weight: 700; font-size: .9rem; }
+
+    .cal-grid-outer { padding: 1rem 1.2rem 1.2rem; }
+    .cal-weekdays {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      text-align: center;
+      margin-bottom: .5rem;
+    }
+    .cal-weekday { font-size: .7rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; }
+    .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+
+    .cal-day {
+      aspect-ratio: 1;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: .75rem;
+      font-weight: 600;
+      position: relative;
+      cursor: default;
+      min-height: 44px;
+      transition: transform .15s;
+    }
+    .cal-day.empty { background: transparent !important; }
+    .cal-day.no-class { background: #f1f5f9; color: #cbd5e1; }
+    .cal-day.today-ring { box-shadow: 0 0 0 2.5px var(--brand2); }
+
+    .cal-day.est-P { background: #dcfce7; color: #166534; }
+    .cal-day.est-A { background: #fee2e2; color: #991b1b; }
+    .cal-day.est-T { background: #fef9c3; color: #854d0e; }
+    .cal-day.est-N { background: #dbeafe; color: #1e40af; }
+
+    .cal-day:not(.empty):not(.no-class):hover { transform: scale(1.12); z-index: 2; }
+
+    .cal-day .d-num { font-size: .8rem; font-weight: 700; line-height: 1.1; }
+    .cal-day .d-lbl { font-size: .58rem; font-weight: 800; letter-spacing: .2px; margin-top: 1px; }
+    .cal-day .d-materia {
+      font-size: .55rem;
+      font-weight: 600;
+      text-align: center;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      padding: 0 2px;
+      opacity: .8;
+      line-height: 1;
+      margin-top: 1px;
+    }
+
+    /* Tooltip para materia */
+    .cal-day[data-materia]:hover::after {
+      content: attr(data-materia);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      color: #fff;
+      font-size: .68rem;
+      padding: 3px 9px;
+      border-radius: 7px;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 20;
+      font-weight: 600;
+    }
+
+    /* ─── RESUMEN STATS ─── */
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; }
+    .stat-box {
+      border-radius: 12px;
+      padding: .85rem .5rem;
+      text-align: center;
+    }
+    .stat-val { font-size: 1.5rem; font-weight: 800; line-height: 1; font-family: 'Space Grotesk', sans-serif; }
+    .stat-lbl { font-size: .7rem; color: #64748b; margin-top: .25rem; }
+    .sb-P { background: #dcfce7; }
+    .sb-P .stat-val { color: #16a34a; }
+    .sb-A { background: #fee2e2; }
+    .sb-A .stat-val { color: #dc2626; }
+    .sb-T { background: #fef9c3; }
+    .sb-T .stat-val { color: #d97706; }
+    .sb-pct { background: #f0f9ff; }
+    .sb-pct .stat-val { color: #0284c7; }
+
+    /* ─── LEYENDA ─── */
+    .leyenda { display: flex; flex-wrap: wrap; gap: .5rem; padding: .8rem 1.2rem; background: #f8fafc; border-top: 1px solid #e2e8f0; }
+    .leyenda-item { display: flex; align-items: center; gap: .3rem; font-size: .75rem; font-weight: 600; }
+    .leyenda-dot { width: 12px; height: 12px; border-radius: 4px; }
+    .lP { background: #dcfce7; border: 1.5px solid #16a34a; }
+    .lA { background: #fee2e2; border: 1.5px solid #dc2626; }
+    .lT { background: #fef9c3; border: 1.5px solid #d97706; }
+    .lN { background: #dbeafe; border: 1.5px solid #2563eb; }
+
+    /* ─── PAGOS ─── */
+    .estado-badge {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .5rem 1rem;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: .82rem;
+    }
+    .ep-bien   { background: #dcfce7; color: #166534; }
+    .ep-aviso  { background: #fef9c3; color: #854d0e; }
+    .ep-mal    { background: #fee2e2; color: #991b1b; }
+    .ep-nc     { background: #f1f5f9; color: #475569; }
+
+    .stat-fin { border-radius: 12px; padding: 1rem; text-align: center; background: #f8fafc; }
+    .stat-fin .val { font-size: 1.4rem; font-weight: 800; font-family: 'Space Grotesk', sans-serif; }
+
+    /* ─── TABLA ─── */
+    .mini-table td, .mini-table th { padding: .45rem .8rem; font-size: .82rem; }
+
+    /* ─── ANIMACIÓN ─── */
+    @keyframes fadeUp { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+    .fade-up { animation: fadeUp .4s ease both; }
+    .fade-up:nth-child(2) { animation-delay: .05s; }
+    .fade-up:nth-child(3) { animation-delay: .10s; }
+    .fade-up:nth-child(4) { animation-delay: .15s; }
+
+    /* ─── FOOTER ─── */
+    .portal-footer { text-align: center; padding: 1.5rem 0; color: #94a3b8; font-size: .8rem; border-top: 1px solid #e2e8f0; margin-top: 2rem; }
+
+    @media (max-width: 576px) {
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .portal-header h1 { font-size: 1.25rem; }
+      .cal-day { min-height: 38px; }
+    }
+  </style>
 </head>
 <body>
 
-{# ── Header ── #}
+{# ─── HEADER ─── #}
 <div class="portal-header mb-4">
-    <div class="container">
-        <div class="d-flex align-items-center gap-3">
-            <i class="bi bi-people-fill fs-1"></i>
-            <div>
-                <h1 class="h3 mb-0 fw-bold">Portal de Padres de Familia</h1>
-                <p class="mb-0 opacity-75">Consulta asistencia y estado de pagos de tu hijo/a</p>
-            </div>
-        </div>
+  <div class="container">
+    <div class="d-flex align-items-center gap-3">
+      <div style="font-size:2.5rem; opacity:.85;">🎓</div>
+      <div>
+        <h1>Portal de Padres de Familia</h1>
+        <p>Consulta asistencia, materias y estado de pagos de tu hijo/a</p>
+      </div>
     </div>
+  </div>
 </div>
 
 <div class="container pb-5">
 
-    {# ── Formulario de búsqueda ── #}
-    <div class="row justify-content-center mb-4">
-        <div class="col-md-6">
-            <div class="card portal-card p-4">
-                <h5 class="fw-bold mb-3">
-                    <i class="bi bi-search me-2 text-primary"></i>Buscar estudiante
-                </h5>
-                <form method="POST" action="{{ url_for('portal_padres') }}">
-                    <div class="input-group">
-                        <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
-                        <input
-                            type="text"
-                            name="cedula"
-                            class="form-control form-control-lg {% if error %}is-invalid{% endif %}"
-                            placeholder="Ingresa el número de cédula"
-                            value="{{ cedula_buscada }}"
-                            autofocus
-                            maxlength="20"
-                        >
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="bi bi-arrow-right-circle me-1"></i>Consultar
-                        </button>
-                        {% if error %}
-                        <div class="invalid-feedback">{{ error }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="form-text mt-2">
-                        <i class="bi bi-shield-lock me-1"></i>
-                        Solo necesitas la cédula del estudiante. No se requiere contraseña.
-                    </div>
-                </form>
-            </div>
-        </div>
+  {# ─── FORMULARIO ─── #}
+  <div class="row justify-content-center mb-5">
+    <div class="col-md-7 col-lg-6">
+      <div class="search-card fade-up">
+        <h5 class="mb-1"><i class="bi bi-search me-2"></i>Buscar estudiante</h5>
+        <p class="text-muted small mb-3">Ingresa la cédula de identidad del estudiante.</p>
+        <form method="POST" action="{{ url_for('portal_padres') }}">
+          <div class="search-input-wrap mb-2">
+            <div class="prefix"><i class="bi bi-person-badge"></i></div>
+            <input type="text" name="cedula"
+                   placeholder="Número de cédula"
+                   value="{{ cedula_buscada }}"
+                   autofocus maxlength="20"
+                   class="{{ 'is-invalid' if error else '' }}">
+            <button type="submit" class="btn-consultar">
+              <i class="bi bi-arrow-right-circle me-1"></i>Consultar
+            </button>
+          </div>
+          {% if error %}
+          <div class="text-danger small"><i class="bi bi-exclamation-triangle-fill me-1"></i>{{ error }}</div>
+          {% endif %}
+          <div class="text-muted small mt-2">
+            <i class="bi bi-shield-lock me-1"></i>Solo necesitas la cédula. Sin contraseña.
+          </div>
+        </form>
+      </div>
     </div>
+  </div>
 
-    {# ── Resultados ── #}
-    {% if resultado %}
-    {% set est = resultado.estudiante %}
-    {% set mes_nombre = resultado.primer_dia.strftime('%B %Y') %}
+  {# ─── RESULTADOS ─── #}
+  {% if resultado %}
+  {% set est = resultado.estudiante %}
 
-    {# — Encabezado del estudiante — #}
-    <div class="row justify-content-center mb-4">
-        <div class="col-md-10">
-            <div class="card portal-card p-4 border-start border-5 border-primary">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
-                         style="width:56px;height:56px;font-size:1.6rem;">
-                        <i class="bi bi-person-fill"></i>
-                    </div>
-                    <div>
-                        <h4 class="fw-bold mb-0">
-                            {{ est.nombre }} {{ est.apellido }}
-                        </h4>
-                        <span class="text-muted">
-                            Cédula: {{ est.cedula or '—' }}
-                            {% if est.curso %}
-                            &nbsp;·&nbsp; Programa: <strong>{{ est.curso.nombre }}</strong>
-                            {% endif %}
-                        </span>
-                    </div>
-                </div>
-            </div>
+  {# Datos del estudiante #}
+  <div class="row justify-content-center mb-4">
+    <div class="col-lg-10 fade-up">
+      <div class="student-card d-flex align-items-center gap-3 flex-wrap">
+        <div class="avatar"><i class="bi bi-person-fill"></i></div>
+        <div class="flex-grow-1">
+          <h4 class="fw-bold mb-0" style="font-family:'Space Grotesk',sans-serif;">
+            {{ est.nombre }} {{ est.apellido }}
+          </h4>
+          <div class="text-muted small mt-1 d-flex flex-wrap gap-2">
+            {% if est.cedula %}<span><i class="bi bi-person-vcard me-1"></i>CI: {{ est.cedula }}</span>{% endif %}
+            {% if est.curso %}<span><i class="bi bi-book me-1"></i>{{ est.curso.nombre }}</span>{% endif %}
+          </div>
         </div>
+        {# Estado de pago general #}
+        {% set ep = resultado.estado_pago %}
+        <div class="estado-badge
+          {% if ep in ['al-dia','pendiente-inicio'] or resultado.saldo_pendiente <= 0 %}ep-bien
+          {% elif ep == 'por-vencer' %}ep-aviso
+          {% elif ep == 'vencido' %}ep-mal
+          {% else %}ep-nc{% endif %}">
+          <i class="bi
+            {% if ep in ['al-dia','pendiente-inicio'] or resultado.saldo_pendiente <= 0 %}bi-check-circle-fill
+            {% elif ep == 'por-vencer' %}bi-exclamation-triangle-fill
+            {% elif ep == 'vencido' %}bi-x-circle-fill
+            {% else %}bi-dash-circle{% endif %}"></i>
+          {% if resultado.saldo_pendiente <= 0 %}Al día
+          {% elif ep == 'por-vencer' %}Por vencer
+          {% elif ep == 'vencido' %}Pago vencido
+          {% else %}Sin cobertura{% endif %}
+        </div>
+      </div>
     </div>
+  </div>
 
-    <div class="row justify-content-center g-4">
-        <div class="col-md-10">
+  <div class="row justify-content-center g-4">
+    <div class="col-lg-10">
 
-            {# ══ SECCIÓN ASISTENCIA ══ #}
-            <div class="card portal-card mb-4">
-                <div class="card-header bg-white border-bottom py-3">
-                    <h5 class="mb-0 fw-bold">
-                        <i class="bi bi-calendar-check me-2 text-success"></i>
-                        Asistencia — {{ mes_nombre }}
-                    </h5>
+      {# ══ ASISTENCIA POR GRUPO (calendario) ══ #}
+      {% if resultado.resumen_grupos %}
+        {% for rg in resultado.resumen_grupos %}
+        {% set mes_nombre = resultado.primer_dia.strftime('%B %Y') if resultado.primer_dia is defined else '' %}
+        <div class="section-card mb-4 fade-up">
+
+          {# Header con navegación de mes #}
+          <div class="section-header">
+            <h5>
+              <i class="bi bi-calendar2-check-fill me-2"></i>
+              {{ rg.grupo.nombre }}
+              <span style="opacity:.75; font-weight:400; font-size:.82rem; margin-left:.4rem;">— {{ rg.categoria }}</span>
+            </h5>
+            {# Navegación mes/año #}
+            <div class="cal-nav">
+              <form method="POST" style="display:contents;">
+                <input type="hidden" name="cedula" value="{{ cedula_buscada }}">
+                <input type="hidden" name="grupo_cal" value="{{ rg.grupo.id }}">
+                {% set m_ant = resultado.mes - 1 if resultado.mes > 1 else 12 %}
+                {% set a_ant = resultado.anio if resultado.mes > 1 else resultado.anio - 1 %}
+                {% set m_sig = resultado.mes + 1 if resultado.mes < 12 else 1 %}
+                {% set a_sig = resultado.anio if resultado.mes < 12 else resultado.anio + 1 %}
+                <button type="submit" name="nav_mes" value="{{ a_ant }}-{{ m_ant }}" class="cal-nav-btn">
+                  <i class="bi bi-chevron-left"></i>
+                </button>
+                <span class="cal-mes-label">
+                  {{ ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][resultado.mes-1] }}
+                  {{ resultado.anio }}
+                </span>
+                <button type="submit" name="nav_mes" value="{{ a_sig }}-{{ m_sig }}" class="cal-nav-btn">
+                  <i class="bi bi-chevron-right"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <div class="card-body p-3">
+
+            {# STATS del mes #}
+            <div class="stat-grid mb-3">
+              <div class="stat-box sb-P">
+                <div class="stat-val">{{ rg.conteo.P }}</div>
+                <div class="stat-lbl">Presentes</div>
+              </div>
+              <div class="stat-box sb-A">
+                <div class="stat-val">{{ rg.conteo.A }}</div>
+                <div class="stat-lbl">Ausentes</div>
+              </div>
+              <div class="stat-box sb-T">
+                <div class="stat-val">{{ rg.conteo.T }}</div>
+                <div class="stat-lbl">Atrasos</div>
+              </div>
+              <div class="stat-box sb-pct">
+                <div class="stat-val {{ 'text-success' if rg.pct_asistencia >= 80 else 'text-danger' }}">
+                  {{ rg.pct_asistencia }}%
                 </div>
-                <div class="card-body">
+                <div class="stat-lbl">Asistencia</div>
+              </div>
+            </div>
 
-                    {# Leyenda #}
-                    <div class="d-flex flex-wrap gap-3 mb-4">
-                        <span class="badge bg-success px-3 py-2"><i class="bi bi-check-circle me-1"></i> Presente (P)</span>
-                        <span class="badge bg-danger px-3 py-2"><i class="bi bi-x-circle me-1"></i> Ausente (A)</span>
-                        <span class="badge bg-warning text-dark px-3 py-2"><i class="bi bi-clock me-1"></i> Atraso (T)</span>
-                        <span class="badge bg-primary px-3 py-2"><i class="bi bi-file-text me-1"></i> Con permiso (N)</span>
-                    </div>
+            {# CALENDARIO del mes #}
+            {% if rg.asistencias %}
+            <div class="cal-grid-outer px-0 pt-0 pb-0">
+              <div class="cal-weekdays">
+                {% for d in ['Lu','Ma','Mi','Ju','Vi','Sá','Do'] %}
+                <div class="cal-weekday">{{ d }}</div>
+                {% endfor %}
+              </div>
 
-                    {% if resultado.resumen_grupos %}
-                        {% for rg in resultado.resumen_grupos %}
-                        <div class="mb-4 p-3 bg-light rounded-3">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <div>
-                                    <h6 class="fw-bold mb-0">{{ rg.grupo.nombre }}</h6>
-                                    <small class="text-muted">{{ rg.categoria }}</small>
-                                </div>
-                                <div class="text-end">
-                                    <div class="fw-bold fs-5 {% if rg.pct_asistencia >= 80 %}text-success{% elif rg.pct_asistencia >= 60 %}text-warning{% else %}text-danger{% endif %}">
-                                        {{ rg.pct_asistencia }}%
-                                    </div>
-                                    <small class="text-muted">Asistencia</small>
-                                </div>
-                            </div>
+              <div class="cal-days">
+                {# Calcular primer día del mes mostrado #}
+                {% set primer = resultado.primer_dia %}
+                {% set offset = primer.weekday() %}
+                {% for _ in range(offset) %}
+                  <div class="cal-day empty"></div>
+                {% endfor %}
 
-                            {# Barra de progreso #}
-                            <div class="progress pct-bar mb-3">
-                                <div class="progress-bar
-                                    {% if rg.pct_asistencia >= 80 %}bg-success
-                                    {% elif rg.pct_asistencia >= 60 %}bg-warning
-                                    {% else %}bg-danger{% endif %}"
-                                     style="width: {{ rg.pct_asistencia }}%">
-                                </div>
-                            </div>
+                {# Mapa de asistencia por día para este grupo #}
+                {% set mapa_dias = {} %}
+                {% for a in rg.asistencias %}
+                  {% if mapa_dias.update({a.fecha.day: a}) %}{% endif %}
+                {% endfor %}
 
-                            {# Contadores #}
-                            <div class="d-flex flex-wrap gap-2 mb-3">
-                                <span class="badge bg-success">✓ {{ rg.conteo.P }} Presentes</span>
-                                <span class="badge bg-danger">✗ {{ rg.conteo.A }} Ausentes</span>
-                                <span class="badge bg-warning text-dark">⏱ {{ rg.conteo.T }} Atrasos</span>
-                                <span class="badge bg-primary">📄 {{ rg.conteo.N }} Permisos</span>
-                                <span class="badge bg-secondary">Total: {{ rg.total_clases }} clases</span>
-                            </div>
-
-                            {# Detalle día a día #}
-                            {% if rg.asistencias %}
-                            <div>
-                                <small class="text-muted d-block mb-2">Detalle por día:</small>
-                                {% for a in rg.asistencias %}
-                                <span class="day-badge day-{{ a.estado }}"
-                                      title="{{ a.fecha.strftime('%d/%m') }} — {{ a.estado_texto if a.estado_texto is defined else a.estado }}">
-                                    {{ a.fecha.day }}
-                                </span>
-                                {% endfor %}
-                            </div>
-                            {% else %}
-                            <p class="text-muted mb-0"><small>Sin registros de asistencia este mes.</small></p>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="text-center py-4 text-muted">
-                            <i class="bi bi-calendar-x fs-1 mb-2 d-block"></i>
-                            El estudiante no está inscrito en ningún grupo activo.
-                        </div>
+                {% set total_dias_mes = (resultado.ultimo_dia - resultado.primer_dia).days + 1 %}
+                {% for d in range(1, total_dias_mes + 1) %}
+                  {% set reg = mapa_dias.get(d) %}
+                  {% set is_today = d == now().day and resultado.mes == now().month and resultado.anio == now().year %}
+                  <div class="cal-day
+                    {% if reg %}est-{{ reg.estado }}{% else %}no-class{% endif %}
+                    {% if is_today %}today-ring{% endif %}"
+                    {% if reg and reg.materia %}data-materia="{{ reg.materia }}"{% endif %}
+                    title="{% if reg %}Día {{ d }}: {{ reg.estado }}{% if reg.materia %} · {{ reg.materia }}{% endif %}{% if reg.observacion %} · {{ reg.observacion }}{% endif %}{% else %}Día {{ d }}: Sin clase{% endif %}"
+                  >
+                    <span class="d-num">{{ d }}</span>
+                    {% if reg %}
+                      <span class="d-lbl">{{ reg.estado }}</span>
+                      {% if reg.materia %}
+                        <span class="d-materia">{{ reg.materia[:6] }}</span>
+                      {% endif %}
                     {% endif %}
-
-                </div>
+                  </div>
+                {% endfor %}
+              </div>
             </div>
-
-            {# ══ SECCIÓN MENSUALIDADES ══ #}
-            <div class="card portal-card">
-                <div class="card-header bg-white border-bottom py-3">
-                    <h5 class="mb-0 fw-bold">
-                        <i class="bi bi-credit-card me-2 text-primary"></i>
-                        Estado de Mensualidades
-                    </h5>
-                </div>
-                <div class="card-body">
-
-                    {# Resumen financiero #}
-                    <div class="row g-3 mb-4">
-                        <div class="col-sm-4">
-                            <div class="text-center p-3 bg-light rounded-3">
-                                <div class="fs-4 fw-bold text-dark">${{ '%.2f'|format(resultado.total_programa) }}</div>
-                                <small class="text-muted">Total programa</small>
-                            </div>
-                        </div>
-                        <div class="col-sm-4">
-                            <div class="text-center p-3 bg-light rounded-3">
-                                <div class="fs-4 fw-bold text-success">${{ '%.2f'|format(resultado.total_pagado) }}</div>
-                                <small class="text-muted">Total pagado</small>
-                            </div>
-                        </div>
-                        <div class="col-sm-4">
-                            <div class="text-center p-3 rounded-3
-                                {% if resultado.saldo_pendiente <= 0 %}bg-success bg-opacity-10
-                                {% else %}bg-danger bg-opacity-10{% endif %}">
-                                <div class="fs-4 fw-bold
-                                    {% if resultado.saldo_pendiente <= 0 %}text-success
-                                    {% else %}text-danger{% endif %}">
-                                    ${{ '%.2f'|format(resultado.saldo_pendiente|abs) }}
-                                </div>
-                                <small class="text-muted">
-                                    {% if resultado.saldo_pendiente <= 0 %}Sin saldo pendiente{% else %}Saldo pendiente{% endif %}
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-
-                    {# Estado general — estado_pago usa guión: 'al-dia', 'por-vencer', 'vencido', 'sin-cobertura', 'pendiente-inicio' #}
-                    {% set ep = resultado.estado_pago %}
-                    <div class="alert
-                        {% if ep in ['al-dia', 'pendiente-inicio'] or resultado.saldo_pendiente <= 0 %}alert-success
-                        {% elif ep == 'por-vencer' %}alert-warning
-                        {% elif ep == 'vencido' %}alert-danger
-                        {% else %}alert-secondary{% endif %} d-flex align-items-center mb-4">
-                        <i class="bi
-                            {% if ep in ['al-dia', 'pendiente-inicio'] or resultado.saldo_pendiente <= 0 %}bi-check-circle-fill
-                            {% elif ep == 'por-vencer' %}bi-exclamation-triangle-fill
-                            {% elif ep == 'vencido' %}bi-x-octagon-fill
-                            {% else %}bi-dash-circle{% endif %} me-2 fs-5"></i>
-                        <div>
-                            <strong>Estado:</strong>
-                            {% if resultado.saldo_pendiente <= 0 and ep != 'sin-cobertura' %}
-                                Al día — sin pagos pendientes
-                            {% elif ep == 'al-dia' %}Al día — sin pagos pendientes
-                            {% elif ep == 'pendiente-inicio' %}Pagado — en espera de inicio de clases
-                            {% elif ep == 'por-vencer' %}Próximo a vencer — renueva pronto
-                            {% elif ep == 'vencido' %}Plan vencido — requiere pago
-                            {% else %}Sin cobertura activa
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    {# Últimos pagos #}
-                    {% if resultado.pagos_recientes %}
-                    <h6 class="fw-bold mb-3">Últimos pagos registrados</h6>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Concepto</th>
-                                    <th class="text-end">Monto</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for pago in resultado.pagos_recientes %}
-                                <tr>
-                                    <td>{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</td>
-                                    <td>{{ pago.concepto or 'Mensualidad' }}</td>
-                                    <td class="text-end fw-bold text-success">${{ '%.2f'|format(pago.monto) }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <p class="text-muted text-center py-3">
-                        <i class="bi bi-inbox me-1"></i>No hay pagos registrados aún.
-                    </p>
-                    {% endif %}
-
-                    {# ── Botón descargar PDF ── #}
-                    <div class="mt-4 pt-3 border-top text-center">
-                        <a href="{{ url_for('portal_padres_pdf', cedula=resultado.estudiante.cedula) }}"
-                           class="btn btn-outline-primary btn-lg"
-                           target="_blank">
-                            <i class="bi bi-file-earmark-pdf me-2"></i>Descargar resumen en PDF
-                        </a>
-                        <p class="text-muted small mt-2 mb-0">
-                            <i class="bi bi-shield-lock me-1"></i>Accede al PDF con la cédula del estudiante.
-                        </p>
-                    </div>
-
-                </div>
+            {% else %}
+            <div class="text-center py-4 text-muted">
+              <i class="bi bi-calendar-x" style="font-size:2.5rem;opacity:.25;"></i>
+              <p class="mt-2 small mb-0">Sin registros de asistencia para este mes.</p>
             </div>
+            {% endif %}
+          </div>
 
+          {# Leyenda y nota sobre materias #}
+          <div class="leyenda">
+            <div class="leyenda-item"><div class="leyenda-dot lP"></div><span style="color:#166534;">Presente</span></div>
+            <div class="leyenda-item"><div class="leyenda-dot lA"></div><span style="color:#991b1b;">Ausente</span></div>
+            <div class="leyenda-item"><div class="leyenda-dot lT"></div><span style="color:#854d0e;">Atraso</span></div>
+            <div class="leyenda-item"><div class="leyenda-dot lN"></div><span style="color:#1e40af;">Permiso</span></div>
+            <span class="ms-auto text-muted" style="font-size:.7rem;">
+              <i class="bi bi-info-circle me-1"></i>Pasa el cursor sobre un día para ver la materia
+            </span>
+          </div>
         </div>
+        {% endfor %}
+
+      {% else %}
+        <div class="section-card mb-4 fade-up">
+          <div class="section-header"><h5><i class="bi bi-calendar-check me-2"></i>Asistencia</h5></div>
+          <div class="text-center py-5 text-muted">
+            <i class="bi bi-calendar-x" style="font-size:3rem;opacity:.2;"></i>
+            <p class="mt-3">El estudiante no está inscrito en ningún grupo activo.</p>
+          </div>
+        </div>
+      {% endif %}
+
+      {# ══ MENSUALIDADES ══ #}
+      <div class="section-card fade-up">
+        <div class="section-header">
+          <h5><i class="bi bi-credit-card-fill me-2"></i>Estado de Mensualidades</h5>
+        </div>
+        <div class="p-3">
+          {# Resumen financiero #}
+          <div class="row g-3 mb-3">
+            <div class="col-sm-4">
+              <div class="stat-fin">
+                <div class="val text-dark">${{ '%.2f'|format(resultado.total_programa) }}</div>
+                <div class="text-muted small">Total programa</div>
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div class="stat-fin">
+                <div class="val text-success">${{ '%.2f'|format(resultado.total_pagado) }}</div>
+                <div class="text-muted small">Total pagado</div>
+              </div>
+            </div>
+            <div class="col-sm-4">
+              <div class="stat-fin">
+                <div class="val {{ 'text-success' if resultado.saldo_pendiente <= 0 else 'text-danger' }}">
+                  ${{ '%.2f'|format(resultado.saldo_pendiente|abs) }}
+                </div>
+                <div class="text-muted small">
+                  {{ 'Sin deuda' if resultado.saldo_pendiente <= 0 else 'Saldo pendiente' }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {# Últimos pagos #}
+          {% if resultado.pagos_recientes %}
+          <h6 class="fw-bold mb-2" style="font-size:.85rem; color:#475569;">Últimos pagos registrados</h6>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mini-table">
+              <thead class="table-light">
+                <tr>
+                  <th>Fecha</th>
+                  <th>Concepto</th>
+                  <th class="text-end">Monto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for pago in resultado.pagos_recientes %}
+                <tr>
+                  <td>{{ pago.fecha_pago.strftime('%d/%m/%Y') }}</td>
+                  <td>{{ pago.concepto or 'Mensualidad' }}</td>
+                  <td class="text-end fw-bold text-success">${{ '%.2f'|format(pago.monto) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted text-center py-3 small">
+            <i class="bi bi-inbox me-1"></i>No hay pagos registrados aún.
+          </p>
+          {% endif %}
+
+          {# Descarga PDF #}
+          <div class="pt-3 border-top text-center mt-2">
+            <a href="{{ url_for('portal_padres_pdf', cedula=resultado.estudiante.cedula) }}"
+               class="btn btn-outline-primary px-4"
+               style="border-radius:12px; font-weight:600;"
+               target="_blank">
+              <i class="bi bi-file-earmark-pdf me-2"></i>Descargar resumen en PDF
+            </a>
+            <p class="text-muted small mt-2 mb-0">
+              <i class="bi bi-shield-lock me-1"></i>Solo lectura — datos en tiempo real
+            </p>
+          </div>
+        </div>
+      </div>
+
     </div>
-    {% endif %}
+  </div>
+  {% endif %}
 
 </div>
 
-{# ── Footer #}
-<footer class="text-center text-muted py-4 mt-4 border-top">
-    <small>Portal de consulta para padres de familia &nbsp;·&nbsp; Solo lectura, información privada</small>
-</footer>
+<div class="portal-footer">
+  <p class="mb-0">Portal de consulta para padres de familia &nbsp;·&nbsp; Solo lectura, información privada</p>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 </body>
