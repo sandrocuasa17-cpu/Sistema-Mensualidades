@@ -564,7 +564,8 @@
             </div>
           </div>
 
-          {# Últimos pagos #}
+          {# Últimos pagos — solo visible para administración #}
+          {% if auth_es_admin() %}
           {% if resultado.pagos_recientes %}
           <h6 class="fw-bold mb-2" style="font-size:.85rem; color:#475569;">Últimos pagos registrados</h6>
           <div class="table-responsive">
@@ -592,8 +593,10 @@
             <i class="bi bi-inbox me-1"></i>No hay pagos registrados aún.
           </p>
           {% endif %}
+          {% endif %}
 
-          {# Descarga PDF #}
+          {# Descarga PDF — solo visible para administración #}
+          {% if auth_es_admin() %}
           <div class="pt-3 border-top text-center mt-2">
             <a href="{{ url_for('portal_padres_pdf', cedula=resultado.estudiante.cedula) }}"
                class="btn btn-outline-primary px-4"
@@ -605,6 +608,7 @@
               <i class="bi bi-shield-lock me-1"></i>Solo lectura — datos en tiempo real
             </p>
           </div>
+          {% endif %}
         </div>
       </div>
 

@@ -21,9 +21,7 @@
             </span>
         </div>
         <div class="ms-auto d-flex gap-2 flex-wrap">
-            <a href="{{ url_for('docente_mis_horas') }}" class="btn btn-success btn-sm">
-                <i class="bi bi-clock-fill me-1"></i>Mis Horas
-            </a>
+            {# Botón Mis Horas deshabilitado temporalmente — solo administrador puede registrar horas #}
             <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-box-arrow-right me-1"></i>Cerrar sesión
             </a>
@@ -78,15 +76,11 @@
                             <i class="bi bi-check2-square me-1"></i>Pasar lista hoy
                         </a>
                         <div class="d-flex gap-2">
-                            <a href="{{ url_for('docente_mis_horas', grupo_id=grupo.id) }}"
-                               class="btn btn-success btn-sm flex-fill"
-                               title="Registrar horas para este grupo">
-                                <i class="bi bi-clock-fill me-1"></i>Registrar horas
-                            </a>
+                            {# Registrar horas deshabilitado — solo administrador #}
                             <a href="{{ url_for('asistencia_reporte', grupo_id=grupo.id) }}"
                                class="btn btn-outline-info btn-sm flex-fill"
                                title="Ver reporte de asistencia">
-                                <i class="bi bi-bar-chart-fill"></i>
+                                <i class="bi bi-bar-chart-fill me-1"></i>Ver reporte
                             </a>
                         </div>
                     </div>

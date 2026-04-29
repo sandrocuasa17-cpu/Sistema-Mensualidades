@@ -158,6 +158,9 @@
   .student-row.fila-A { background: rgba(220,38,38,.04); }
   .student-row.fila-T { background: rgba(217,119,6,.04); }
   .student-row.fila-N { background: rgba(37,99,235,.04); }
+  /* Alerta de pago pendiente — se combina con el estado de asistencia */
+  .student-row.fila-pago-vencido { background: rgba(220,38,38,.12) !important; border-left: 4px solid #dc2626; }
+  .student-row.fila-pago-por-vencer { background: rgba(217,119,6,.10) !important; border-left: 4px solid #d97706; }
 
   .student-name { font-weight: 600; font-size: .9rem; }
   .student-meta { font-size: .75rem; color: var(--txt-sub); }
@@ -411,13 +414,18 @@
             {% for est in estudiantes %}
             {% set reg = registros.get(est.id) %}
             {% set estado_actual = reg.estado if reg else 'P' %}
-            <div class="student-row fila-{{ estado_actual }}" id="fila-{{ est.id }}" data-nombre="{{ est.nombre|lower }} {{ est.apellido|lower }}">
+            <div class="student-row fila-{{ estado_actual }} {% if est.estado_pago in ['vencido','sin-cobertura'] %}fila-pago-vencido{% elif est.estado_pago == 'por-vencer' %}fila-pago-por-vencer{% endif %}" id="fila-{{ est.id }}" data-nombre="{{ est.nombre|lower }} {{ est.apellido|lower }}">
               <div>
-                <div class="student-name">{{ est.nombre }} {{ est.apellido }}</div>
+                <div class="student-name">
+                  {{ est.nombre }} {{ est.apellido }}
+                  {% if est.estado_pago in ['vencido','sin-cobertura'] %}
+                  <i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="Pago vencido — dirigir a dirección"></i>
+                  {% endif %}
+                </div>
                 <div class="student-meta">
                   {% if est.cedula %}CI: {{ est.cedula }}{% endif %}
                   {% if est.estado_pago in ['vencido','sin-cobertura'] %}
-                  &nbsp;<span class="badge bg-danger" style="font-size:.65rem;">⚠ Pago</span>
+                  &nbsp;<span class="badge bg-danger" style="font-size:.65rem;">⚠ Pago pendiente — ir a dirección</span>
                   {% elif est.estado_pago == 'por-vencer' %}
                   &nbsp;<span class="badge bg-warning text-dark" style="font-size:.65rem;">Por vencer</span>
                   {% endif %}
@@ -454,9 +462,7 @@
             <i class="bi bi-bar-chart-fill me-1"></i>Ver reporte
           </a>
           {% if es_vista_docente %}
-          <a href="{{ url_for('docente_mis_horas', grupo_id=grupo.id) }}" class="btn btn-outline-success" style="border-radius:12px;">
-            <i class="bi bi-clock-fill me-1"></i>Registrar mis horas
-          </a>
+          {# Botón Registrar mis horas deshabilitado — solo administrador puede registrar horas #}
           {% endif %}
         </div>
       </form>

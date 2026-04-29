@@ -246,7 +246,8 @@
             </div>
         </div>
 
-        <!-- ── Historial de pagos ── -->
+        <!-- ── Historial de pagos — solo visible para administración ── -->
+        {% if auth_es_admin() %}
         <div class="col-md-7">
             <div class="card h-100">
                 <div class="card-header-custom d-flex align-items-center gap-2">
@@ -292,6 +293,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
         <!-- ── Asistencia del mes ── -->
         <div class="col-12">
@@ -399,8 +401,8 @@
     </div><!-- /row -->
     {% endif %}
 
-    {# ── Botón de descarga PDF (visible solo cuando hay resultado) #}
-    {% if estudiante %}
+    {# ── Botón de descarga PDF — solo visible para administración #}
+    {% if estudiante and auth_es_admin() %}
     <div class="text-center my-4">
         <a href="{{ url_for('portal_padres_pdf', cedula=request.form.get('cedula','')) }}"
            class="btn btn-lg px-4"
