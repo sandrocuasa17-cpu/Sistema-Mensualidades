@@ -4714,18 +4714,40 @@ def portal_padres():
                 saldo_pendiente  = estudiante.saldo_pendiente
                 estado_pago      = estudiante.estado_pago
 
+                # Calcular deuda real de mensualidades para portal de padres
+                valor_mensual = float(estudiante.curso.precio_mensual) if estudiante.curso else 0
+                meses_pagados = estudiante.mensualidades_canceladas or 0
+
+                if estado_pago in ['vencido', 'sin-cobertura', 'por-vencer']:
+                    if estudiante.curso and not estudiante.curso.es_indefinido:
+                        duracion = estudiante.curso.duracion_meses or 0
+                        meses_deuda = max(0, duracion - meses_pagados)
+                    else:
+                        if estudiante.plan_vencido and valor_mensual > 0:
+                            dias_vencido = abs(estudiante.dias_restantes or 0)
+                            meses_deuda = max(1, round(dias_vencido / 30))
+                        else:
+                            meses_deuda = 0
+                    deuda_mensualidades = round(meses_deuda * valor_mensual, 2)
+                else:
+                    meses_deuda = 0
+                    deuda_mensualidades = 0
+
                 resultado = {
-                    'estudiante':      estudiante,
-                    'mes':             mes,
-                    'anio':            anio,
-                    'primer_dia':      primer_dia,
-                    'ultimo_dia':      ultimo_dia,
-                    'resumen_grupos':  resumen_grupos,
-                    'pagos_recientes': pagos_realizados,
-                    'total_programa':  total_programa,
-                    'total_pagado':    total_pagado,
-                    'saldo_pendiente': saldo_pendiente,
-                    'estado_pago':     estado_pago,
+                    'estudiante':          estudiante,
+                    'mes':                 mes,
+                    'anio':                anio,
+                    'primer_dia':          primer_dia,
+                    'ultimo_dia':          ultimo_dia,
+                    'resumen_grupos':      resumen_grupos,
+                    'pagos_recientes':     pagos_realizados,
+                    'total_programa':      total_programa,
+                    'total_pagado':        total_pagado,
+                    'saldo_pendiente':     saldo_pendiente,
+                    'estado_pago':         estado_pago,
+                    'meses_deuda':         meses_deuda,
+                    'valor_mensual':       valor_mensual,
+                    'deuda_mensualidades': deuda_mensualidades,
                 }
 
     return render_template(

@@ -538,36 +538,46 @@
           <h5><i class="bi bi-credit-card-fill me-2"></i>Estado de Mensualidades</h5>
         </div>
         <div class="p-3">
-          {# Resumen financiero #}
-          <div class="row g-3 mb-3">
-            <div class="col-sm-4">
-              <div class="stat-fin">
-                <div class="val text-dark">${{ '%.2f'|format(resultado.total_programa) }}</div>
-                <div class="text-muted small">Total programa</div>
-              </div>
+          {# ── Estado de mensualidades para padres ── #}
+          {% set ep = resultado.estado_pago %}
+
+          {% if ep in ['vencido', 'sin-cobertura', 'por-vencer'] %}
+          {# Alerta de deuda #}
+          <div class="alert alert-danger px-4 py-3 mb-3"
+               style="border-radius:12px; border-left:5px solid #dc2626;">
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+              <strong>Mensualidades pendientes de pago</strong>
             </div>
-            <div class="col-sm-4">
-              <div class="stat-fin">
-                <div class="val text-success">${{ '%.2f'|format(resultado.total_pagado) }}</div>
-                <div class="text-muted small">Total pagado</div>
-              </div>
-            </div>
-            <div class="col-sm-4">
-              <div class="stat-fin">
-                <div class="val {{ 'text-success' if resultado.saldo_pendiente <= 0 else 'text-danger' }}">
-                  ${{ '%.2f'|format(resultado.saldo_pendiente|abs) }}
-                </div>
-                <div class="text-muted small">
-                  {{ 'Sin deuda' if resultado.saldo_pendiente <= 0 else 'Saldo pendiente' }}
-                </div>
-              </div>
+            <ul class="mb-3 ps-3" style="font-size:.93rem; line-height:2.2;">
+              {% if resultado.meses_deuda > 0 %}
+              <li>Deuda pendiente: <strong>{{ resultado.meses_deuda }} mes{{ 'es' if resultado.meses_deuda != 1 else '' }}</strong></li>
+              {% endif %}
+              {% if resultado.valor_mensual > 0 %}
+              <li>Valor mensual: <strong>${{ '%.2f'|format(resultado.valor_mensual) }}</strong></li>
+              {% endif %}
+              <li>Valor total de la deuda: <strong class="text-danger">${{ '%.2f'|format(resultado.deuda_mensualidades) }}</strong></li>
+            </ul>
+            <div class="text-center">
+              <span class="badge bg-danger px-3 py-2" style="font-size:.82rem; border-radius:8px;">
+                Por favor acérquese a secretaría para regularizar su situación
+              </span>
             </div>
           </div>
 
-          {# Últimos pagos — solo visible para administración #}
+          {% else %}
+          {# Al día #}
+          <div class="alert alert-success d-flex align-items-center gap-2 mb-3"
+               style="border-radius:12px;">
+            <i class="bi bi-check-circle-fill fs-5"></i>
+            <span class="fw-semibold">Pagos al día. ¡Gracias!</span>
+          </div>
+          {% endif %}
+
+          {# ── Últimos pagos y PDF: solo administración ── #}
           {% if auth_es_admin() %}
           {% if resultado.pagos_recientes %}
-          <h6 class="fw-bold mb-2" style="font-size:.85rem; color:#475569;">Últimos pagos registrados</h6>
+          <h6 class="fw-bold mb-2 mt-3" style="font-size:.85rem; color:#475569;">Últimos pagos registrados</h6>
           <div class="table-responsive">
             <table class="table table-sm table-hover align-middle mini-table">
               <thead class="table-light">
@@ -593,10 +603,6 @@
             <i class="bi bi-inbox me-1"></i>No hay pagos registrados aún.
           </p>
           {% endif %}
-          {% endif %}
-
-          {# Descarga PDF — solo visible para administración #}
-          {% if auth_es_admin() %}
           <div class="pt-3 border-top text-center mt-2">
             <a href="{{ url_for('portal_padres_pdf', cedula=resultado.estudiante.cedula) }}"
                class="btn btn-outline-primary px-4"

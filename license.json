@@ -1,0 +1,12 @@
+{
+  "license_key": "POS-B707-4DE2-7114-3F28",
+  "license_data": "eyJjbGllbnRlX25vbWJyZSI6ICJEYXZpZCBHb3JkaWxsbyIsICJjbGllbnRlX2VtYWlsIjogInJkZ29yZGlsbG83QHlhaG9vLmNvbSIsICJ0b2tlbiI6ICJiNDRjZmFjZDlmZGJiMDViMjY2NGNkM2MxYmM1M2UzYWY0MDA4MmUxNjVjZjYyMGQzOGJkMWRkYWRiYWFmOGE3IiwgImZlY2hhX2VtaXNpb24iOiAiMjAyNi0wNC0yNiAwMjozMjoyOSIsICJmZWNoYV9leHBpcmFjaW9uIjogIjIwMjctMDQtMjYgMDI6MzI6MjkiLCAiZHVyYWNpb25fZGlhcyI6IDM2NSwgInZlcnNpb24iOiAiMi4xIiwgImFjdGl2YWNpb25lc19wZXJtaXRpZGFzIjogMSwgImVzdGFkbyI6ICJhY3RpdmFkYSIsICJoYXJkd2FyZV9pZCI6ICJiM2YyNWVkM2Y3MjE2Mzk4N2NlMmJhZjk4Yzc3YzM2NWVjMWEyYmYwMjBlYjI4OTQ0ZTIwOGVmMDNiYTI2YzM3IiwgImZlY2hhX2FjdGl2YWNpb24iOiAiMjAyNi0wNC0yOCAyMzozNDozNSJ9",
+  "hardware_id": "b3f25ed3f72163987ce2baf98c77c365ec1a2bf020eb28944e208ef03ba26c37",
+  "activacion_fecha": "2026-04-28 23:34:35",
+  "cliente_nombre": "David Gordillo",
+  "cliente_email": "rdgordillo7@yahoo.com",
+  "fecha_expiracion": "2027-04-26 02:32:29",
+  "version": "2.2",
+  "checksum": "8e9d6645d720285879abeb72602b6938",
+  "tiene_datos_empresa": false
+}
